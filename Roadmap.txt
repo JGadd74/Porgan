@@ -1,0 +1,122 @@
+This is a map of the intended functionality and features of Python One-Click Downloads Organizer (POCD) (Pyorgan??) (name in-progress)
+
+POCD is a command-line version of OCD written in python instead of the original C#.
+
+            
+            
+            Old features vs New
+
+                         OLD     NEW
+Organize                  x       x
+run continuously          x
+unpack                    x       x
+security check                    x
+remove duplicates                 x
+compress                          x
+cross plat                        x
+dry-run                           x
+usr defined categories            x
+
+
+
+
+
+
+Functionality: 
+    Organize files into folders based on 
+        Predefined categories based on file extension
+            remove duplicate files if specified
+        User-defined categories based on file extension
+            remove duplicate files if specified
+        Take args from CLI 
+            -s: security check
+            -a: archive/compress
+            -d: remove duplicates
+            -l target: target directory
+            -m, --move: moves files into categories
+            --new 'name' [type, type ,type...]: new category which includes provided types
+            --list  
+                categories/types
+                my_categories
+            --dry-run: gives user readout of hypothetical run
+            -h, --help: gives help message
+    Archive/compress all or some types of files if specified
+    Removes duplicate files if specified
+    Quarantine suspicious files and alert user
+    Set auto-remove datetime on sorted folders/archives if set
+    Run from anywhere
+    Cross platform
+        Windows
+        Linux - Primary focus
+        Mac
+    Unpack files
+        From folders
+        From archives
+        Not quarantine
+    
+
+    CheckList
+        Runs    x
+        takes args
+            -s             x
+            -a             x   
+            -d             x
+            -l target 
+            --new
+            --list
+            --dry-run      x
+            -m, --move     x
+            -h, --help     x
+        uses args
+            -s 
+            -a 
+            -d             x
+            -l target 
+            --new
+            --list
+            --dry-run      x
+        Organizes
+            into boiler categories      x
+            into custom categories 
+            into quarantine
+            archives                    x
+            removes duplicates          x
+                    patterns to recognize
+                        file(copy).ext              x
+                        file(n).ext                 x
+                        file(nth copy).ext (linux)  x
+                        file -Copy.ext (windows)    x
+                        file -Copy(n).ext (windows) x
+            user-defined directory 
+        Undo
+            Note: deleted files will not be restored
+                  quarantined files will not be restored
+            From folders
+            From archives
+
+
+Functions:
+    move_files
+        create_file_dictionary
+        create_folders
+    archive_files 
+        create_file_dictionary
+        create_archives
+    remove_duplicate_files
+        get_duplicate_files
+    run_security_checks
+        
+
+bugs:
+     Some file extensions exist in more than one category
+     so files get sorted into the wrong folder depending
+     on the order that the categories are listed 
+        FIXED
+    
+
+            
+
+                
+
+        
+            
