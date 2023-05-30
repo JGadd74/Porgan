@@ -5,27 +5,6 @@ import zipfile
 import shutil
 import re
 
-#Why the fuck are these all different dictionaries? this is over fucking complicated.
-#What the fuck was I thinking
-
-# file extensions dictionaries
-images = {'images': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'tiff', 'psd', 'raw', 'heif', 'indd', 'ai', 'eps', 'ps', 'webp']}
-audio = {'audio': ['aac', 'aa', 'dvf', 'm4a', 'm4b', 'm4p', 'mp3', 'msv', 'ogg', 'oga', 'raw', 'vox', 'wav', 'wma']}
-video = {'video': ['3g2', '3gp', 'avi', 'flv', 'h264', 'm4v', 'mkv', 'mov', 'mp4', 'mpg', 'mpeg', 'rm', 'swf', 'vob', 'wmv']}
-documents = {'documents': ['doc', 'docx', 'odt', 'pdf', 'rtf', 'tex', 'txt', 'wks', 'wps', 'wpd', 'csv', 'dat', 'pps', 'ppt', 'pptx', 'ods', 'xls', 'xlsx']}
-executables = {'executables': ['apk', 'bat', 'bin', 'cgi', 'pl', 'com', 'exe', 'gadget', 'jar', 'wsf']}
-archives = {'archives': ['7z', 'arj', 'pkg', 'rar', 'z', 'zip']}
-disc_images = {'disc_images': ['bin', 'dmg', 'iso', 'toast', 'vcd']}
-data = {'data': ['csv', 'dat', 'db', 'dbf', 'log', 'mdb', 'sav', 'sql', 'tar', 'xml']}
-internet = {'internet': ['asp', 'aspx', 'cer', 'cfm', 'cgi', 'pl', 'css', 'htm', 'html', 'js', 'jsp', 'part', 'php', 'py', 'rss', 'xhtml']}
-programming = {'programming': ['c', 'class', 'cpp', 'cs', 'h', 'java', 'sh', 'swift', 'vb', 'py', 'pyc', 'pyo', 'pyd', 'pyw', 'pyz', 'py3', 'pyc3', 'pyo3', 'pyd3', 'pyw3', 'pyz3', 'py2', 'pyc2', 'pyo2', 'pyd2', 'pyw2', 'pyz2']}
-system = {'system': ['bak', 'cab', 'cfg', 'cpl', 'cur', 'dll', 'dmp', 'drv', 'icns', 'ico', 'ini', 'lnk', 'msi', 'sys', 'tmp']}
-misc = {'misc': ['crdownload', 'crx', 'plugin', 'torrent']}
-Linux = {'Linux': ['deb', 'rpm', 'tar.gz', 'tar.xz', 'tar.bz2', 'tar', 'appimage', 'yay', 'pacman', 'snap', 'flatpak']}
-Windows = {'Windows': ['exe', 'msi', 'msix', 'msixbundle', 'msu', 'msp', 'appx', 'appxbundle', 'appxupload', 'appinstaller', 'bat', 'cmd', 'ps1', 'psm1', 'psd1', 'ps1xml', 'psc1', 'psrc', 'reg', 'inf', 'url', 'lnk', 'inf', 'url', 'lnk']}
-models = {'models': ['3ds', '3mf', 'blend', 'fbx', 'gltf', 'obj', 'stl', 'dae', 'dxf', 'lwo', 'lws', 'lxo', 'ma', 'max', 'mb', 'mesh', 'mesh.xml', 'obj', 'ply', 'skp', 'wrl', 'x', 'x3d', 'x3db', 'x3dv', 'xgl', 'zgl']}
-# aggregate all categories into a list
-Extensions_categories = [images, audio, video, documents, executables, archives, disc_images, data, internet, programming, system, misc, Linux, Windows, models]
 
 #TODO: Either remove misc or change unknown folder to 'unknown instead of misc
 Extensions_Dictionary = {
@@ -45,25 +24,6 @@ Extensions_Dictionary = {
     'Windows': ['exe', 'msi', 'msix', 'msixbundle', 'msu', 'msp', 'appx', 'appxbundle', 'appxupload', 'appinstaller', 'bat', 'cmd', 'ps1', 'psm1', 'psd1', 'ps1xml', 'psc1', 'psrc', 'reg', 'inf', 'url', 'lnk', 'inf', 'url', 'lnk'],
     'models': ['3ds', '3mf', 'blend', 'fbx', 'gltf', 'obj', 'stl', 'dae', 'dxf', 'lwo', 'lws', 'lxo', 'ma', 'max', 'mb', 'mesh', 'mesh.xml', 'obj', 'ply', 'skp', 'wrl', 'x', 'x3d', 'x3db', 'x3dv', 'xgl', 'zgl']
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #TODO unbork this
 Target_Directory = './Files/Downloads'
@@ -98,9 +58,6 @@ def get_app_made_zips():
     for f in filenames:
         print(f)
 
-
-
-
 #get args
 parser = argparse.ArgumentParser(description='Takes in arguments from the command line')
 # add arguments
@@ -109,6 +66,7 @@ parser.add_argument('-d', '--deduplicate', action='store_true', help='Remove dup
 parser.add_argument('-s', '--secure', action='store_true', help='Run security checks on files, quarantines suspicious files')
 parser.add_argument('-m', '--move', action='store_true', help='Moves files to their respective folders based on their file extension.')
 parser.add_argument('--dry-run', action='store_true', help='Simulate running the program without actually moving files')
+parser.add_argument('-v', '--verbose', action='store_true', help='Displays verbose output')
 #parser.add_argument('-h', action='store_true', help='Displays help message')
 
 _security_checks = parser.parse_args().secure
@@ -116,13 +74,8 @@ _remove_duplicates = parser.parse_args().deduplicate
 _archive_files = parser.parse_args().archive
 _move_files = parser.parse_args().move
 _dry_run_only = parser.parse_args().dry_run
+_verbose_output = parser.parse_args().verbose
 #show_help_message = parser.parse_args().help
-
-
-
-
-
-
 
 
 #get a dictionary of files with extension as key and list of files as value
@@ -197,16 +150,6 @@ def create_file_dictionary2(file_list):
                 file_dictionary['misc'].append(file)
     return file_dictionary
 
-
-
-
-
-
-
-
-
-
-
 def run_security_checks(files_list):
     """
         Check each file for it's MIME type
@@ -253,9 +196,8 @@ def get_extensions():
         if f.split('.')[-1] not in extensions:
             extensions.append(f.split('.')[-1])
     return extensions
-#find and return duplicate files using regex
-import re
 
+#find and return duplicate files using regex
 def get_duplicate_files(file_list):
     """
     Finds and returns a list of duplicate files in the given file list.
@@ -317,12 +259,6 @@ def remove_duplicates_files(files_list):
                 print(f'\tRemoving {file.split("/")[-1]}...')
                 os.remove(file)
 
-
-
-
-
-
-
 #create folders for each key in file_dict
 def create_folders(file_dict):
     print('creating folders...')
@@ -334,8 +270,6 @@ def create_folders(file_dict):
             os.mkdir(f'{Target_Directory}/{key}')
 
 #create archives for each key in file_dict
-import zipfile
-
 def create_archives(file_dict):
     #TODO TEST!!! untested
     for key in file_dict.keys():
@@ -428,6 +362,23 @@ def archive_files(file_dict):
 
 
 
+def move_or_archive_files(file_dict):
+    #TODO combine move and archive functions here
+    
+    if _move_files:
+        move_files(file_dict)
+    elif _archive_files:
+        archive_files(file_dict)
+
+def dry_run_mode():
+    #TODO multimodal dry run
+
+    if _move_files:
+        print('Dry run mode: moving files only.')
+    elif _archive_files:
+        print('Dry run mode: archiving files only.')
+    if _remove_duplicates:
+        print('Dry run mode: removing duplicates only.')
 
 
 
@@ -475,7 +426,14 @@ if __name__ == '__main__':
     if _move_files and _archive_files:
         print('ERROR: Cannot move and archive files at the same time.')
         exit()
+
     
+
+
+    if _dry_run_only:
+        dry_run_mode()
+        print("Done!")
+        exit()
 
     # run security checks
     if _security_checks:
@@ -484,18 +442,13 @@ if __name__ == '__main__':
     if _remove_duplicates:
         remove_duplicates_files(Raw_File_List)
     
-
-    if _move_files or _archive_files:
-    # create dictionary of files
-        File_Dict = create_file_dictionary2(Raw_File_List)
-
-        # archive or move files
-        if _move_files:
-            #print(f'moving {get_value_count_from_dict(File_Dict)} files...')
-            move_files(File_Dict)
-        else:
-            #print(f'archiving {get_value_count_from_dictionary(File_Dict)} files...')
-            archive_files(File_Dict)
+    if _move_files ^ _archive_files:
+    # Either _move_files or _archive_files is True, but not both
+       move_or_archive_files(create_file_dictionary2(Raw_File_List))
+    elif _move_files and _archive_files:
+    # Both _move_files and _archive_files are either True or False
+        print('ERROR: Cannot move and archive files at the same time.')
+        exit()
     
 
     print('Done!')
