@@ -67,14 +67,18 @@ Functionality:
             --dry-run      x
             -m, --move     x
             -h, --help     x
+            -v, --verbose  x
         uses args
             -s 
-            -a 
+            -a             x
             -d             x
             -l target 
             --new
             --list
             --dry-run      x
+            -m, --move     x
+            -h, --help
+            -v, --verbose
         Organizes
             into boiler categories      x
             into custom categories 
@@ -97,7 +101,7 @@ Functionality:
 
 Functions:
     move_files
-        create_file_dictionary
+        create_file_dictionary 
         create_folders
     archive_files 
         create_file_dictionary

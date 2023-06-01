@@ -22,6 +22,11 @@ Extensions_Dictionary = {
     'models': ['3ds', '3mf', 'blend', 'fbx', 'gltf', 'obj', 'stl', 'dae', 'dxf', 'lwo', 'lws', 'lxo', 'ma', 'max', 'mb', 'mesh', 'mesh.xml', 'obj', 'ply', 'skp', 'wrl', 'x', 'x3d', 'x3db', 'x3dv', 'xgl', 'zgl']
 }
 
+#verbose output
+def verbose_only_print(*args, **kwargs):
+    if _verbose_output:
+        print(*args, **kwargs)
+
 #set to folder to be organized
 Target_Directory = './Files/Downloads'
 
@@ -81,6 +86,7 @@ def create_file_dictionary(file_list):
     
     #TODO add contingency for files with no extensions
     #     add contingency for empty file list
+    #     remove case sensitivity for extensions
 
     file_dictionary = {}
     check_list = []
@@ -110,7 +116,8 @@ def run_security_checks(files_list):
         if the MIME type does not match the file extension, quarantine the file
         if the file has no extension, quarantine the file
     """
-    
+    print('Not ready for testing....')
+    return
     print('running security checks...')
     #check for files with no extension
     for file in files_list:
@@ -135,7 +142,7 @@ def run_security_checks(files_list):
 
     if response.lower() == 'y' or 'yes':
         # delete quarantined files
-        os.remove(f'{Target_Directory}/quarantine')
+        shutil.rmtree(f'{Target_Directory}/quarantine')
         print('Quarantined files have been deleted.')
     else:
         print('Quarantined files have not been deleted.')
@@ -152,6 +159,7 @@ def get_duplicate_files(file_list):
         list: A list of file paths that are duplicates.
 
     """
+    #TODO check if original file exists(i.e. file(1).txt and file.txt))
     # List of patterns to match
     patterns = [
         re.compile(r'.*\(copy\)\.\w+$'),
@@ -171,6 +179,7 @@ def get_duplicate_files(file_list):
         for pattern in patterns:
             match = pattern.match(filename)
             if match:
+                print(f'{pattern} matched {filename}')
                 duplicate_files.append(filename)
                 break
     #print(f'{len(duplicate_files)} duplicate files found...')
@@ -184,17 +193,6 @@ def remove_duplicates_files(files_list):
     if len(duplicates) == 0:
         print('No duplicate files found.')
         return
-    #check if dry run
-    if _dry_run_only:
-        #print status
-        print("DRY RUN ONLY, NO FILES WILL BE REMOVED.")
-        print ("The following duplicate files would be removed:")
-        for d in duplicates:
-            #print what would be removed, only filename 
-            print(f"\t{d.split('/')[-1]}")
-        #stop function
-        print("Dry run complete, no files removed.")
-        return
     else:
          #print status
         print (f"Removing {len(duplicates)} duplicate files...")
@@ -204,7 +202,6 @@ def remove_duplicates_files(files_list):
                 #print file being removed
                 print(f'\tRemoving {file.split("/")[-1]}...')
                 os.remove(file)
-    Raw_File_List = [f for f in get_absolute_file_paths(Target_Directory) if f not in get_app_made_zips()]
 
 #create folders for each key in file_dict
 def create_folders(file_dict):
@@ -234,7 +231,7 @@ def create_archives(file_dict):
 #move or archive files, takes file_dict(category:filepath) as an argument
 def move_or_archive_files(file_dict):
     #default mode is move
-
+    #TODO check if file already exists in target folder/archive
     #set action for status message
     action = ['Moving','moved']
     to_zip = ''
@@ -245,7 +242,7 @@ def move_or_archive_files(file_dict):
         create_archives(file_dict)
     else:
         create_folders(file_dict)
-        
+    #print status, ex: Moving 5 files..., Archiving 5 files...
     print(f'{action[0]} {get_value_count_from_dictionary(file_dict)} files...')
     
     # iterate through file_dict
@@ -288,43 +285,59 @@ def move_or_archive_files(file_dict):
     print(f'{action_count} files {action[1]}.')
 
 #dry run. prints what would happen without actually changing anything
-def dry_run_mode(file_dict):
+def dry_run_mode(file_dict, file_list):
     #TODO multimodal dry run
 
     if _security_checks:
-        print('Dry run mode: security checks only.')
+        print('Dry run mode: limited security check only.')
     if _remove_duplicates:
-        print('Dry run mode: removing duplicates only.')
-    if _move_files:
-        print('DRY RUN ONLY, NO FILES WILL BE MOVED.')
-        #print which folders will be created
-        #and which files go in which folders
+        #get list of duplicate files
+        duplicates = get_duplicate_files(file_list)
+        #check if duplicates exist
+        if len(duplicates) == 0:
+            print('No duplicate files found.')
+            return
+        #if duplicates exist
+        else:
+            print("Dry run mode: No files will be removed.")
+            print ("The following duplicate files would be removed:")
+            for d in duplicates:
+            #print what would be removed, only filename 
+                print(f"\t{d.split('/')[-1]}")
+            print("Dry run complete, no files removed.")    
+    if _move_files or _archive_files:
+        action = ['Moving','moved']
+        to_zip = ''
+        if _archive_files:
+            action = ['Archiving','archived']
+            to_zip = '.zip'
+        
+        print(f'Dry run mode: no files will be {action[1]}.')
+        #print which folders/archives will be created
+        #and which files go in which folders/archives
         for key, value in file_dict.items():
-            print(f'moving {len(value)} file(s) to {key}...')
+            #ex: Moving 5 files to Documents., Archiving 5 files to Documents.zip.
+            print(f'{action[0]} {len(value)} file(s) to {key}{to_zip}...')
             for file in value:
                 print(f'\t{file.split("/")[-1]}...')
-        print('Dry run complete, no files moved.')
-        #stop function
-        return
-    elif _archive_files:
-        print('Dry run mode: archiving files only.')
-
+        print(f'Dry run complete, no files {action[1]}.')
+    
 #debug info
 def print_debug_info():
-    #print which options are enabled
-        print(f'\n')
-        
-        statements = [("security_checks", _security_checks), 
-                      ("remove_duplicates", _remove_duplicates), 
-                      ("archive_files", _archive_files), 
-                      ("move_files", _move_files), 
-                      ("dry_run_only", _dry_run_only), 
-                      ("verbose", _verbose_output)]
-
-        # Print the statements as two columns
-        for statement in statements:
-            print("{:<20} {}".format(statement[0], statement[1]))
-        print(f'\n')
+    """
+    Prints the current status of the enabled options for the PORGAN program.
+    """
+    statements = [("security_checks", _security_checks), 
+                  ("remove_duplicates", _remove_duplicates), 
+                  ("archive_files", _archive_files), 
+                  ("move_files", _move_files), 
+                  ("dry_run_only", _dry_run_only), 
+                  ("verbose", _verbose_output)]
+    print('\n')
+    # Print the statements as two columns
+    for statement in statements:
+        print("{:<20} {}".format(statement[0], statement[1]))
+    print('\n')
     
 #troubleshooting/debugging functions
 def get_value_count_from_dictionary(d):
@@ -367,7 +380,7 @@ if __name__ == '__main__':
     print(".....................................................\n\n")
     
     if _dry_run_only:
-        dry_run_mode(create_file_dictionary(get_raw_file_list()))
+        dry_run_mode(create_file_dictionary(get_raw_file_list()), get_raw_file_list())
         print("Done!")
         exit()
 
