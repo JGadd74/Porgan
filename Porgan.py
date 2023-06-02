@@ -25,6 +25,7 @@ Extensions_Dictionary = {
 
 #verbose output
 def verbose_only_print(*args, **kwargs):
+    #TODO replace print statements with this
     if _verbose_output:
         print(*args, **kwargs)
 
@@ -187,7 +188,6 @@ def get_duplicate_files(file_list):
 
 #safely remove duplicate files. includes dry run functionality
 def remove_duplicates_files(files_list):    
-    #TODO move dry_run to dry_run_mode
     #get list of duplicate files
     duplicates = get_duplicate_files(files_list)
     if len(duplicates) == 0:
@@ -286,7 +286,6 @@ def move_or_archive_files(file_dict):
 
 #dry run. prints what would happen without actually changing anything
 def dry_run_mode(file_dict, file_list):
-    #TODO multimodal dry run
 
     if _security_checks:
         print('Dry run mode: limited security check only.')
