@@ -32,7 +32,7 @@ Functionality:
             -s: security check
             -a: archive/compress
             -d: remove duplicates
-            -l target: target directory
+            -t, --target: target directory
             -m, --move: moves files into categories
             --new 'name' [type, type ,type...]: new category which includes provided types
             --list  

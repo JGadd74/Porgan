@@ -3,10 +3,11 @@ import os
 import zipfile
 import shutil
 import re
+import yaml
 
 #TODO add more file extensionss
 Extensions_Dictionary = {
-    'images': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'tiff', 'psd', 'raw', 'heif', 'indd', 'ai', 'eps', 'ps', 'webp'],
+   """  'images': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'tiff', 'psd', 'raw', 'heif', 'indd', 'ai', 'eps', 'ps', 'webp'],
     'audio': ['aac', 'aa', 'dvf', 'm4a', 'm4b', 'm4p', 'mp3', 'msv', 'ogg', 'oga', 'raw', 'vox', 'wav', 'wma'],
     'videos': ['3g2', '3gp', 'avi', 'flv', 'h264', 'm4v', 'mkv', 'mov', 'mp4', 'mpg', 'mpeg', 'rm', 'swf', 'vob', 'wmv'],
     'documents': ['doc', 'docx', 'odt', 'pdf', 'rtf', 'tex', 'txt', 'wks', 'wps', 'wpd', 'csv', 'dat', 'pps', 'ppt', 'pptx', 'ods', 'xls', 'xlsx'],
@@ -20,14 +21,12 @@ Extensions_Dictionary = {
     'misc': ['crdownload', 'crx', 'plugin', 'torrent'],
     'Linux': ['deb', 'rpm', 'tar.gz', 'tar.xz', 'tar.bz2', 'tar', 'appimage', 'yay', 'pacman', 'snap', 'flatpak'],
     'Windows': ['exe', 'msi', 'msix', 'msixbundle', 'msu', 'msp', 'appx', 'appxbundle', 'appxupload', 'appinstaller', 'bat', 'cmd', 'ps1', 'psm1', 'psd1', 'ps1xml', 'psc1', 'psrc', 'reg', 'inf', 'url', 'lnk', 'inf', 'url', 'lnk'],
-    'models': ['3ds', '3mf', 'blend', 'fbx', 'gltf', 'obj', 'stl', 'dae', 'dxf', 'lwo', 'lws', 'lxo', 'ma', 'max', 'mb', 'mesh', 'mesh.xml', 'obj', 'ply', 'skp', 'wrl', 'x', 'x3d', 'x3db', 'x3dv', 'xgl', 'zgl']
+    'models': ['3ds', '3mf', 'blend', 'fbx', 'gltf', 'obj', 'stl', 'dae', 'dxf', 'lwo', 'lws', 'lxo', 'ma', 'max', 'mb', 'mesh', 'mesh.xml', 'obj', 'ply', 'skp', 'wrl', 'x', 'x3d', 'x3db', 'x3dv', 'xgl', 'zgl'] """
 }
 
-#verbose output
-def verbose_only_print(*args, **kwargs):
-    #TODO replace print statements with this
-    if _verbose_output:
-        print(*args, **kwargs)
+with open('Extensions.yaml', 'r') as f:
+        Extensions_Dictionary = yaml.safe_load(f)
+
 
 #set to folder to be organized
 Target_Directory = './Files/Downloads'
@@ -51,7 +50,7 @@ def get_app_made_zips():
     return zips
 
 #get all files that are not created by this app
-def get_raw_file_list():
+def get_files_in_target_directory():
     return [f for f in get_absolute_file_paths(Target_Directory) if f not in get_app_made_zips()]
 
 #get args
@@ -68,7 +67,7 @@ parser.add_argument('-t', '--target', type=str, help=f'Target directory to organ
 # parse arguments
 _archive_files = parser.parse_args().archive
 _move_files = parser.parse_args().move
-_remove_duplicates = parser.parse_args().deduplicate
+_remove_duplicates = parser.parse_args().rm_duplicates
 _security_checks = parser.parse_args().secure
 _dry_run_only = parser.parse_args().dry_run
 _verbose_output = parser.parse_args().verbose
@@ -180,7 +179,6 @@ def get_duplicate_files(file_list):
         for pattern in patterns:
             match = pattern.match(filename)
             if match:
-                print(f'{pattern} matched {filename}')
                 duplicate_files.append(filename)
                 break
     #print(f'{len(duplicate_files)} duplicate files found...')
@@ -369,7 +367,7 @@ def has_shared_value(dict_list):
 if __name__ == '__main__':
     print('Starting...')
     
-    if len(get_raw_file_list()) == 0:
+    if len(get_files_in_target_directory()) == 0:
         print('No files found, exiting...')
         exit()
 
@@ -379,7 +377,7 @@ if __name__ == '__main__':
     print(".....................................................\n\n")
     
     if _dry_run_only:
-        dry_run_mode(create_file_dictionary(get_raw_file_list()), get_raw_file_list())
+        dry_run_mode(create_file_dictionary(get_files_in_target_directory()), get_files_in_target_directory())
         print("Done!")
         exit()
 
@@ -387,16 +385,16 @@ if __name__ == '__main__':
 
     # run security checks
     if _security_checks:
-        run_security_checks(get_raw_file_list())
+        run_security_checks(get_files_in_target_directory())
     # run duplicates removal
     if _remove_duplicates:
-        remove_duplicates_files(get_raw_file_list())
+        remove_duplicates_files(get_files_in_target_directory())
     
     #Primary tasks......................
 
     if _move_files ^ _archive_files:
     # Either _move_files or _archive_files is True, but not both
-       move_or_archive_files(create_file_dictionary(get_raw_file_list()))
+       move_or_archive_files(create_file_dictionary(get_files_in_target_directory()))
     elif _move_files and _archive_files:
     # Both _move_files and _archive_files are either True or False
         print('ERROR: Cannot move and archive files at the same time.')
