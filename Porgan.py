@@ -4,6 +4,7 @@ import zipfile
 import shutil
 import re
 
+#TODO add more file extensionss
 Extensions_Dictionary = {
     'images': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'tiff', 'psd', 'raw', 'heif', 'indd', 'ai', 'eps', 'ps', 'webp'],
     'audio': ['aac', 'aa', 'dvf', 'm4a', 'm4b', 'm4p', 'mp3', 'msv', 'ogg', 'oga', 'raw', 'vox', 'wav', 'wma'],
@@ -53,23 +54,23 @@ def get_raw_file_list():
     return [f for f in get_absolute_file_paths(Target_Directory) if f not in get_app_made_zips()]
 
 #get args
-parser = argparse.ArgumentParser(description='Takes in arguments from the command line')
+parser = argparse.ArgumentParser(description='Organizes files by removing duplicates, archiving, or moving them to their respective folders based on their file extension.')
 # add arguments
-parser.add_argument('-a', '--archive', action='store_true', help='Archives files in compressed folders.')
-parser.add_argument('-d', '--deduplicate', action='store_true', help='Remove duplicate files when moving files.')
-parser.add_argument('-s', '--secure', action='store_true', help='Run security checks on files, quarantines suspicious files')
+parser.add_argument('-a', '--archive', action='store_true', help='Archives files to their respective zip files based on their file extension.')
 parser.add_argument('-m', '--move', action='store_true', help='Moves files to their respective folders based on their file extension.')
-parser.add_argument('--dry-run', action='store_true', help='Simulate running the program without actually moving files')
+parser.add_argument('-d', '--rm-duplicates', action='store_true', help='Remove duplicate files.')
+parser.add_argument('-s', '--secure', action='store_true', help='Run security checks on files, quarantines suspicious files')
+parser.add_argument('--dry-run', action='store_true', help='Simulate running the program without actually moving/removing files')
 parser.add_argument('-v', '--verbose', action='store_true', help='Displays verbose output')
-#parser.add_argument('-h', action='store_true', help='Displays help message')
+parser.add_argument('-t', '--target', type=str, help=f'Target directory to organize. Defaults to {Target_Directory}')
 
-_security_checks = parser.parse_args().secure
-_remove_duplicates = parser.parse_args().deduplicate
+# parse arguments
 _archive_files = parser.parse_args().archive
 _move_files = parser.parse_args().move
+_remove_duplicates = parser.parse_args().deduplicate
+_security_checks = parser.parse_args().secure
 _dry_run_only = parser.parse_args().dry_run
 _verbose_output = parser.parse_args().verbose
-#show_help_message = parser.parse_args().help
 
 #get a dictionary of files with extension as key and list of files as value
 def create_file_dictionary(file_list):
@@ -85,15 +86,14 @@ def create_file_dictionary(file_list):
     """
     
     #TODO add contingency for files with no extensions
-    #     add contingency for empty file list
-    #     remove case sensitivity for extensions
 
     file_dictionary = {}
     check_list = []
     for file in file_list:
         for key, val in Extensions_Dictionary.items():
             for ext in val:
-                if file.endswith(f'.{ext}'):
+                if file.lower().endswith(f'.{ext}'):
+                #if file.endswith(f'.{ext}'):
                     if key in file_dictionary:
                         file_dictionary[key].append(file)
                     else:

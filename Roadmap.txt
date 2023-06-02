@@ -61,7 +61,7 @@ Functionality:
             -s             x
             -a             x   
             -d             x
-            -l target 
+            -t, --target    x
             --new
             --list
             --dry-run      x
@@ -72,7 +72,7 @@ Functionality:
             -s 
             -a             x
             -d             x
-            -l target 
+            -t, --target 
             --new
             --list
             --dry-run      x
