@@ -11,12 +11,10 @@ import yaml
     # settings includes the default target directory
     # extensions includes the file extensions and their corresponding categories (extensions dictionary)
 #the Organizer class will be used to organize the files
-#the main function will be used to run the program
-    # the main function will take arguments from the command line
-    # the main function will create an instance of the data_fetcher class
-    # the main function will create an instance of the Organizer class
-    # the main function will call the organize_files method of the Organizer class
-
+#the main class will be used to run the program
+    # the main class __init__ will take arguments from the command line
+    # the main class will create an instance of the Organizer class
+        # the Organizer will create an instance of the DataFetcher class
 
 class DataFetcher:
     # this fetches data for other classes
@@ -78,7 +76,7 @@ class DataFetcher:
     
     def get_app_made_zips(self):
         zips = []
-        filenames = list(Extensions_Dictionary.keys())
+        filenames = list(self.extensions_dictionary.keys())
         for f in filenames:
             zips.append(f + '.zip')
         return zips
@@ -88,7 +86,7 @@ class DataFetcher:
         if target_directory is None:
             print("No target directory set.")
             return None
-        return [f for f in self._get_absolute_file_paths(target_directory) if f not in get_app_made_zips()]
+        return [f for f in self._get_absolute_file_paths(target_directory) if f not in self.get_app_made_zips()]
     
     def get_duplicate_files(self, file_list):
         """
@@ -188,35 +186,35 @@ class FileOrganizer:
         self.extensions_dictionary = self.data_fetcher.extensions_dictionary
         self.file_list = self.data_fetcher.file_list
         #...CLI arguments...
-        self.archive = archive
+        self._archive_files = archive
         self.move = move
         self.remove_duplicates = remove_duplicates
         self._verbose_output = verbose_output
 
     #create folders for each key in file_dict
-    def create_folders(file_dict):
-        if _verbose_output:
+    def create_folders(self, file_dict):
+        if self._verbose_output:
             print('creating folders...')
         folders_created = []
         for key in file_dict.keys():
             # check if folder exists
-            if not os.path.exists(f'{Target_Directory}/{key}'):
+            if not os.path.exists(f'{self.target_directory}/{key}'):
                 # if not, create folder
-                if _verbose_output:
+                if self._verbose_output:
                     print(f'\t{key}...')
-                os.mkdir(f'{Target_Directory}/{key}')
+                os.mkdir(f'{self.target_directory}/{key}')
                 folders_created.append(key)
-        if _verbose_output:
+        if self._verbose_output:
             for f in folders_created:
                 print(f'\t{f} folder created.')
 
     #create archives for each key in file_dict
-    def create_archives(file_dict):
+    def create_archives(self, file_dict):
         for key in file_dict.keys():
             # check if archive exists
-            if not os.path.exists(f'{Target_Directory}/{key}.zip'):
+            if not os.path.exists(f'{self.target_directory}/{key}.zip'):
                 # if not, create archive
-                shutil.make_archive(f'{Target_Directory}/{key}', 'zip', f'{Target_Directory}/{key}')
+                shutil.make_archive(f'{self.target_directory}/{key}', 'zip', f'{self.target_directory}/{key}')
    
     #safely remove duplicate files
     def remove_duplicates_files(this, files_list):    
@@ -236,21 +234,32 @@ class FileOrganizer:
                     os.remove(file)
 
     #move or archive files, takes file_dict(category:filepath) as an argument
-    def move_or_archive_files(file_dict):
+    def move_or_archive_files(self, file_dict, archive_files = False):
             #default mode is move
         #TODO check if file already exists in target folder/archive
         #set action for status message
         action = ['Moving','moved']
         to_zip = ''
 
-        if _archive_files:
+        if archive_files:
+            # check if archive exists
+            if not os.path.exists(f'{self.target_directory}/{file_category}.zip'):
+                # if not, create archive
+                shutil.make_archive(f'{self.target_directory}/{file_category}', 'zip', f'{self.target_directory}/{file_category}')
+            with zipfile.ZipFile(f'{self.target_directory}/{file_category}.zip', 'a') as zip:
+                # remove absolute path from filename before zipping
+                zip.write(f'{file}', arcname=f'{file.split("/")[-1]}')
+                # remove original file
+                os.remove(f'{file}')
+                action_count += 1
             action = ['Archiving','archived']
             to_zip = '.zip'
-            create_archives(file_dict)
+            self.create_archives(file_dict)
         else:
-            create_folders(file_dict)
+            self.create_folders(file_dict)
         #print status, ex: Moving 5 files..., Archiving 5 files...
-        print(f'{action[0]} {get_value_count_from_dictionary(file_dict)} files...')
+        file_count = sum(len(value) for value in file_dict.values())
+        print(f'{action[0]} {file_count} files...')
         
         # iterate through file_dict
         action_count = 0
@@ -264,9 +273,9 @@ class FileOrganizer:
                     print(f'\t{action[0]} {file}...')
                     
                     #archiving files
-                    if _archive_files:
-                        if os.path.exists(f'{Target_Directory}/{file_category}.zip'):
-                            with zipfile.ZipFile(f'{Target_Directory}/{file_category}.zip', 'a') as zip:
+                    if archive_files:
+                        if os.path.exists(f'{self.target_directory}/{file_category}.zip'):
+                            with zipfile.ZipFile(f'{self.target_directory}/{file_category}.zip', 'a') as zip:
                                 #remove absolutepath from filename before zipping
                                 zip.write(f'{file}', arcname=f'{file.split("/")[-1]}')
                                 #remove original file
@@ -274,19 +283,19 @@ class FileOrganizer:
                                 action_count += 1
                         else:
                             #print error message
-                            print(f'\t{Target_Directory}/{file_category}.zip does not exist, skipping...')
+                            print(f'\t{self.target_directory}/{file_category}.zip does not exist, skipping...')
                     
                     #Moving files
                     else:
-                        if os.path.exists(f'{Target_Directory}/{file_category}'):
+                        if os.path.exists(f'{self.target_directory}/{file_category}'):
                             #move file
                             #strip filepath from filename
                             file_no_path = file.split('/')[-1]
-                            shutil.move(f'{file}', f'{Target_Directory}/{file_category}/{file_no_path}')
+                            shutil.move(f'{file}', f'{self.target_directory}/{file_category}/{file_no_path}')
                             action_count += 1
                         else:
                         #print error message
-                            print(f'\t{Target_Directory}/{file_category} does not exist, skipping...')
+                            print(f'\t{self.target_directory}/{file_category} does not exist, skipping...')
         #print status
         # ex: 5 files moved., 5 files archived.
         print(f'{action_count} files {action[1]}.')
@@ -300,7 +309,8 @@ class FileOrganizer:
         if self._archive
         if self._move
         """
-        
+        if False:
+            self.move_or_archive_files(self.extensions_dictionary, self._archive_files)
         pass
 
 class SecurityManager:
@@ -334,7 +344,7 @@ class Main:
         parser.add_argument('-s', '--secure', action='store_true', help='Run security checks on files, quarantines suspicious files')
         parser.add_argument('--dry-run', action='store_true', help='Simulate running the program without actually moving/removing files')
         parser.add_argument('-v', '--verbose', action='store_true', help='Displays verbose output')
-        parser.add_argument('-t', '--target', type=str, help=f'Target directory to organize. Defaults to {Target_Directory}')
+        parser.add_argument('-t', '--target', type=str, help=f'Target directory to organize. Default is /home/user/Downloads')
         self.args = parser.parse_args()
 
     def run(self):
