@@ -4,6 +4,7 @@ import zipfile
 import shutil
 import re
 import yaml
+import logging
 
 
 # in OO version of Porgan, these are the classes that will be used
@@ -33,7 +34,8 @@ class DataFetcher:
     """
     new_target_directory = ''
 
-    def __init__(self, settings_file, extensions_file, target_directory = None ):
+    def __init__(self, fileIOreporter, settings_file, extensions_file, target_directory = None ):
+        self.reporter = fileIOreporter
         self.settings = self._load_yaml(settings_file)
         self.extensions_dictionary = self._load_yaml(extensions_file)    
         self._set_target_directory(target_directory)
@@ -57,12 +59,12 @@ class DataFetcher:
             None
         """
         if target_directory is not None and os.path.isdir(target_directory) and os.path.exists(target_directory):
-            print("Target directory set to:", target_directory)
+            self.reporter.logger.info("Target directory set to:", target_directory)
             self.new_target_directory = target_directory
         else:
             #load default target directory from settings file
             #print("Settings:", self.settings)
-            print("loading default target directory from settings file...")
+            self.reporter.logger.info("loading default target directory from settings file...")
             self.new_target_directory = self.settings['target_directory']
             #print("Target directory:", self.new_target_directory)
 
@@ -179,9 +181,9 @@ class FileOrganizer:
             remove_duplicates     (bool): Whether or not to remove duplicate files.
             verbose_output        (bool): Whether or not to print verbose output.
     """
-    def __init__(self, target_directory = None, archive = False, move = False, remove_duplicates = False, verbose_output=False):
+    def __init__(self, fileIOreporter, data_fetcher, archive = False, move = False, remove_duplicates = False):
         
-        self.data_fetcher = DataFetcher('./Settings.yaml','./Extensions.yaml', target_directory)
+        self.data_fetcher = data_fetcher
         self.target_directory = self.data_fetcher.new_target_directory
         self.extensions_dictionary = self.data_fetcher.extensions_dictionary
         self.file_list = self.data_fetcher.file_list
@@ -189,11 +191,12 @@ class FileOrganizer:
         self._archive_files = archive
         self.move = move
         self.remove_duplicates = remove_duplicates
-        self._verbose_output = verbose_output
+        self.reporter = fileIOreporter
 
     #create folders for each key in file_dict
     def create_folders(self, file_dict):
         if self._verbose_output:
+            #TODO replace with logger
             print('creating folders...')
         folders_created = []
         for key in file_dict.keys():
@@ -218,13 +221,20 @@ class FileOrganizer:
    
     #safely remove duplicate files
     def remove_duplicates_files(this, files_list):    
+        #TODO move files to temp folder and delete later
+        #TODO add permanant delete option to settings.yaml
+        #TODO add restore option
+        #TODO rename duplicate with no original
         #get list of duplicate files
         duplicates = this.data_fetcher.get_duplicate_files(this.data_fetcher.file_list)
+        files_remove = 0
         if len(duplicates) == 0:
+            #TODO replace with logging
             print('No duplicate files found.')
             return
         else:
             #print status
+            #TODO replace with logging
             print (f"Removing {len(duplicates)} duplicate files...")
             for file in duplicates:
                 #safely remove duplicates
@@ -232,8 +242,11 @@ class FileOrganizer:
                     #print file being removed
                     print(f'\tRemoving {file.split("/")[-1]}...')
                     os.remove(file)
+                    files_remove += 1
+        #TODO replace with logging
+        print(f'{files_remove} files removed.')
 
-    #move or archive files, takes file_dict(category:filepath) as an argument
+    #deprecated
     def move_or_archive_files(self, file_dict, archive_files = False):
             #default mode is move
         #TODO check if file already exists in target folder/archive
@@ -254,6 +267,7 @@ class FileOrganizer:
                 action_count += 1
             action = ['Archiving','archived']
             to_zip = '.zip'
+            # WTF?  
             self.create_archives(file_dict)
         else:
             self.create_folders(file_dict)
@@ -300,19 +314,80 @@ class FileOrganizer:
         # ex: 5 files moved., 5 files archived.
         print(f'{action_count} files {action[1]}.')
     
+    def move_files(self, file_dict):
+        all_files_moved = True
+        self.create_folders(file_dict)
+        file_count = sum(len(value) for value in file_dict.values())
+        #TODO replace with logging
+        print(f'Moving {file_count} files...')
+        action_count = 0
+        for file_category, file_list in file_dict.items():
+            #TODO replace with logging
+            print(f'Moving {len(file_list)} file(s) to {file_category}...')
+            for file in file_list:
+                if os.path.exists(f'{file}'):
+                    #TODO check if file already exists in target folder
+                    #TODO replace with logging
+                    print(f'\tMoving {file}...')
+                    #strip filepath from filename
+                    file_no_path = file.split('/')[-1]
+                    shutil.move(f'{file}', f'{self.target_directory}/{file_category}/{file_no_path}')
+                    action_count += 1
+                else:
+                    #TODO replace with logging
+                    print(f'\t{file} does not exist, skipping...')
+                    all_files_moved = False
+        #TODO replace with logging
+        print(f'{action_count} files moved.')
+        return all_files_moved
+
+    def archive_files(self, file_dict):
+        all_files_archived = True
+        self.create_archives(file_dict)
+        file_count = sum(len(value) for value in file_dict.values())
+        #TODO replace with logging
+        print(f'Archiving {file_count} files...')
+        action_count = 0    
+        for file_category, file_list in file_dict.items():
+            #TODO replace with logging
+            print(f'Archiving {len(file_list)} file(s) to {file_category}.zip...')
+            for file in file_list:
+                if os.path.exists(f'{file}'):
+                    #TODO check file already exists in archive
+                    #TODO replace with logging
+                    print(f'\tArchiving {file}...')
+                    with zipfile.ZipFile(f'{self.target_directory}/{file_category}.zip', 'a') as zip:
+                        #remove absolutepath from filename before zipping
+                        zip.write(f'{file}', arcname=f'{file.split("/")[-1]}')
+                        #remove original file
+                        os.remove(f'{file}')
+                        action_count += 1
+                else:
+                    #TODO replace with logging
+                    print(f'\t{file} does not exist, skipping...')
+                    all_files_archived = False
+        #TODO replace with logging
+        print(f'{action_count} files archived.')
+        return all_files_archived
+
     def organize_files(self):
-        #placeholder
-
-        # Implement the logic to organize files based on extensions_dictionary.
         """
+        this function will call the other functions in this class to organize the files
+        return bool to indicate total success or partial to total failure
+        """
+       
+        duplicates_removed_success = True
+        files_archived_success = True
+        files_moved_sucess = True
         if self._remove_duplicates:
-        if self._archive
-        if self._move
-        """
-        if False:
-            self.move_or_archive_files(self.extensions_dictionary, self._archive_files)
-        pass
-
+            duplicates_removed_success = self.remove_duplicates(self.extensions_dictionary)
+        if self._archive_files:
+            files_archived_success = self.archive_files(self.extensions_dictionary)
+        elif self._move_files:
+            files_moved_sucess = self.move_files(self.extensions_dictionary)
+        
+        return duplicates_removed_success and files_archived_success and files_moved_sucess
+        
 class SecurityManager:
     """
         This class will handle security functions such as:
@@ -326,6 +401,79 @@ class SecurityManager:
     def __init__(self):
         pass
 
+class FileIOReporter:
+    """
+    this class will handle all logging and dry run functions
+
+
+    logging rules:
+        - always log:
+            - start of program
+            - start of each function
+            - end of each function
+            - end of program
+        - log if verbose:
+            - each step of each function
+            - each file moved
+            - each file archived
+            - each file removed/moved to duplicates folder
+            - each file quarantined
+            - each file skipped
+        - log if warning:
+            - category folder not found
+            - category archive not found
+            - file already exists
+        - log if error:
+            -
+            - file not found
+        - log if critical:
+            - settings file not found
+            - extensions file not found
+            - target directory not found
+            - target directory not writable
+            - permissions error
+
+    """
+    def __init__(self, target_directory, move_mode, archive_mode, remove_duplicates_mode, log_level=logging.DEBUG, data_fetcher=None):
+        self._dry_move = move_mode
+        self._dry_archive = archive_mode
+        self._dry_remove_duplicates = remove_duplicates_mode        
+        
+        self.logger = logging.getLogger("system_logger")
+
+        self.logger.setLevel(log_level)
+
+        self.handler = logging.StreamHandler()
+        self.formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+        self.handler.setFormatter(self.formatter)
+        self.logger.addHandler(self.handler)
+
+        self.fetcher = data_fetcher
+
+
+    
+    def dry_move(self):
+        self.logger.info('Dry run: Moving files...')
+        pass
+
+    def dry_archive(self):
+        self.logger.info('Dry run: Archiving files...')
+        pass
+
+    def dry_remove_duplicates(self):
+        self.logger.info('Dry run: Removing duplicates...')
+        pass
+
+    def dry_run(self):
+        if self.dry_remove_duplicates:
+            self.dry_remove_duplicates()
+        if self.dry_archive:
+            self.dry_archive()
+        elif self.dry_move:
+            self.dry_move()
+        pass
+    
 class Main:
     """
     gets arguments from command line
@@ -348,19 +496,42 @@ class Main:
         self.args = parser.parse_args()
 
     def run(self):
-        print('Starting...')
 
-        organizer = FileOrganizer(target_directory = self.args.target,
-                 archive = self.args.archive,
-                 move = self.args.move,
-                 remove_duplicates = self.args.rm_duplicates,
-                 verbose_output=self.args.verbose)
+        reporter = FileIOReporter(self.args.target, 
+                                  move_mode=self.args.move, 
+                                  archive_mode=self.args.archive, 
+                                  remove_duplicates_mode=self.args.rm_duplicates, 
+                                  log_level = logging.DEBUG if self.args.verbose else logging.INFO)
+
+        fetcher = DataFetcher( fileIOreporter = reporter, 
+                               settings_file = './Settings.yaml', 
+                               extensions_file = './Extensions.yaml', 
+                               target_directory = self.args.target)
+
+        reporter.fetcher = fetcher
+
+
+        reporter.logger.info("Starting...")
+
+
+        organizer = FileOrganizer( fileIOreporter = reporter,
+                                   data_fetcher= fetcher,
+                                   archive = self.args.archive,
+                                   move = self.args.move,
+                                   remove_duplicates = self.args.rm_duplicates)
                 
+        organizer_sucess = True
         if self.args.dry_run:
-            print("Running in dry run mode.")
+            reporter.dry_run()
+        elif self.args.archive and self.args.move:
+            reporter.logger.error("Cannot archive and move at the same time. Please choose one or the other.")
+            organizer_sucess = False
         else:
-            organizer.organize_files()
-        print("Done.")
+            organizer_sucess = organizer.organize_files()
+        if organizer_sucess:
+            reporter.logger.info("Finished.")
+        else:
+            reporter.logger.error("Finished with errors.")
 
 # main
 if __name__ == '__main__':
