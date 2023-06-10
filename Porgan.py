@@ -5,6 +5,7 @@ import shutil
 import re
 import yaml
 import logging
+import typing
 
 
 # in OO version of Porgan, these are the classes that will be used
@@ -32,9 +33,9 @@ class DataFetcher:
         target_directory (str) - the target directory to overwrite the default target directory
             if None, the default target directory will be used
     """
-    new_target_directory = ''
-
+    
     def __init__(self, fileIOreporter, settings_file, extensions_file, target_directory = None ):
+        self.new_target_directory = ''
         self.reporter = fileIOreporter
         self.settings = self._load_yaml(settings_file)
         self.extensions_dictionary = self._load_yaml(extensions_file)    
@@ -183,33 +184,33 @@ class FileOrganizer:
     """
     def __init__(self, fileIOreporter, data_fetcher, archive = False, move = False, remove_duplicates = False):
         
-        self.data_fetcher = data_fetcher
-        self.target_directory = self.data_fetcher.new_target_directory
-        self.extensions_dictionary = self.data_fetcher.extensions_dictionary
-        self.file_list = self.data_fetcher.file_list
+        self.fetcher = data_fetcher
+        self.target_directory = self.fetcher.new_target_directory
+        self.extensions_dictionary = self.fetcher.extensions_dictionary
+        self.file_list = self.fetcher.file_list
         #...CLI arguments...
         self._archive_files = archive
-        self.move = move
-        self.remove_duplicates = remove_duplicates
+        self._move_files = move
+        self._remove_duplicates = remove_duplicates
         self.reporter = fileIOreporter
 
     #create folders for each key in file_dict
     def create_folders(self, file_dict):
-        if self._verbose_output:
+        #if self._verbose_output:
             #TODO replace with logger
-            print('creating folders...')
+         #   print('creating folders...')
         folders_created = []
         for key in file_dict.keys():
             # check if folder exists
             if not os.path.exists(f'{self.target_directory}/{key}'):
                 # if not, create folder
-                if self._verbose_output:
-                    print(f'\t{key}...')
+                #if self._verbose_output:
+                    #print(f'\t{key}...')
                 os.mkdir(f'{self.target_directory}/{key}')
                 folders_created.append(key)
-        if self._verbose_output:
-            for f in folders_created:
-                print(f'\t{f} folder created.')
+        #if self._verbose_output:
+         #   for f in folders_created:
+          #      print(f'\t{f} folder created.')
 
     #create archives for each key in file_dict
     def create_archives(self, file_dict):
@@ -220,13 +221,13 @@ class FileOrganizer:
                 shutil.make_archive(f'{self.target_directory}/{key}', 'zip', f'{self.target_directory}/{key}')
    
     #safely remove duplicate files
-    def remove_duplicates_files(this, files_list):    
+    def remove_duplicates_files(this):    
         #TODO move files to temp folder and delete later
         #TODO add permanant delete option to settings.yaml
         #TODO add restore option
         #TODO rename duplicate with no original
         #get list of duplicate files
-        duplicates = this.data_fetcher.get_duplicate_files(this.data_fetcher.file_list)
+        duplicates = this.fetcher.get_duplicate_files(this.fetcher.file_list)
         files_remove = 0
         if len(duplicates) == 0:
             #TODO replace with logging
@@ -380,11 +381,11 @@ class FileOrganizer:
         files_archived_success = True
         files_moved_sucess = True
         if self._remove_duplicates:
-            duplicates_removed_success = self.remove_duplicates(self.extensions_dictionary)
+            duplicates_removed_success = self.remove_duplicates_files()
         if self._archive_files:
             files_archived_success = self.archive_files(self.extensions_dictionary)
         elif self._move_files:
-            files_moved_sucess = self.move_files(self.extensions_dictionary)
+            files_moved_sucess = self.move_files(self.fetcher.create_file_dictionary(self.fetcher.get_file_list(self.fetcher.new_target_directory)))
         
         return duplicates_removed_success and files_archived_success and files_moved_sucess
         
