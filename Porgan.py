@@ -5,18 +5,6 @@ import shutil
 import re
 import yaml
 import logging
-import typing
-
-
-# in OO version of Porgan, these are the classes that will be used
-# the data_fetcher class will be used to get the data from settings and extensions files
-    # settings includes the default target directory
-    # extensions includes the file extensions and their corresponding categories (extensions dictionary)
-#the Organizer class will be used to organize the files
-#the main class will be used to run the program
-    # the main class __init__ will take arguments from the command line
-    # the main class will create an instance of the Organizer class
-        # the Organizer will create an instance of the DataFetcher class
 
 class DataFetcher:
     # this fetches data for other classes
@@ -144,6 +132,10 @@ class DataFetcher:
         file_dictionary = {}
         check_list = []
         for file in self.file_list:
+            #if file has no extension
+            if '.' not in file:
+                #do something?
+                pass
             for key, val in self.extensions_dictionary.items():
                 for ext in val:
                     if file.lower().endswith(f'.{ext}'):
@@ -180,7 +172,6 @@ class FileOrganizer:
             archive               (bool): Whether or not to archive files.
             move                  (bool): Whether or not to move files.
             remove_duplicates     (bool): Whether or not to remove duplicate files.
-            verbose_output        (bool): Whether or not to print verbose output.
     """
     def __init__(self, fileIOreporter, data_fetcher, archive = False, move = False, remove_duplicates = False):
         
@@ -246,74 +237,6 @@ class FileOrganizer:
                     files_remove += 1
         #TODO replace with logging
         print(f'{files_remove} files removed.')
-
-    #deprecated
-    def move_or_archive_files(self, file_dict, archive_files = False):
-            #default mode is move
-        #TODO check if file already exists in target folder/archive
-        #set action for status message
-        action = ['Moving','moved']
-        to_zip = ''
-
-        if archive_files:
-            # check if archive exists
-            if not os.path.exists(f'{self.target_directory}/{file_category}.zip'):
-                # if not, create archive
-                shutil.make_archive(f'{self.target_directory}/{file_category}', 'zip', f'{self.target_directory}/{file_category}')
-            with zipfile.ZipFile(f'{self.target_directory}/{file_category}.zip', 'a') as zip:
-                # remove absolute path from filename before zipping
-                zip.write(f'{file}', arcname=f'{file.split("/")[-1]}')
-                # remove original file
-                os.remove(f'{file}')
-                action_count += 1
-            action = ['Archiving','archived']
-            to_zip = '.zip'
-            # WTF?  
-            self.create_archives(file_dict)
-        else:
-            self.create_folders(file_dict)
-        #print status, ex: Moving 5 files..., Archiving 5 files...
-        file_count = sum(len(value) for value in file_dict.values())
-        print(f'{action[0]} {file_count} files...')
-        
-        # iterate through file_dict
-        action_count = 0
-        for file_category, file_list in file_dict.items():
-            # iterate through files in value
-            print(f'{action[0]} {len(file_list)} file(s) to {file_category}{to_zip}...')
-            for file in file_list:
-                # check if file exists
-                if os.path.exists(f'{file}'):
-                    # if so, move file to folder
-                    print(f'\t{action[0]} {file}...')
-                    
-                    #archiving files
-                    if archive_files:
-                        if os.path.exists(f'{self.target_directory}/{file_category}.zip'):
-                            with zipfile.ZipFile(f'{self.target_directory}/{file_category}.zip', 'a') as zip:
-                                #remove absolutepath from filename before zipping
-                                zip.write(f'{file}', arcname=f'{file.split("/")[-1]}')
-                                #remove original file
-                                os.remove(f'{file}')
-                                action_count += 1
-                        else:
-                            #print error message
-                            print(f'\t{self.target_directory}/{file_category}.zip does not exist, skipping...')
-                    
-                    #Moving files
-                    else:
-                        if os.path.exists(f'{self.target_directory}/{file_category}'):
-                            #move file
-                            #strip filepath from filename
-                            file_no_path = file.split('/')[-1]
-                            shutil.move(f'{file}', f'{self.target_directory}/{file_category}/{file_no_path}')
-                            action_count += 1
-                        else:
-                        #print error message
-                            print(f'\t{self.target_directory}/{file_category} does not exist, skipping...')
-        #print status
-        # ex: 5 files moved., 5 files archived.
-        print(f'{action_count} files {action[1]}.')
     
     def move_files(self, file_dict):
         all_files_moved = True
@@ -327,13 +250,21 @@ class FileOrganizer:
             print(f'Moving {len(file_list)} file(s) to {file_category}...')
             for file in file_list:
                 if os.path.exists(f'{file}'):
-                    #TODO check if file already exists in target folder
+
+                    #TODO add error handling
                     #TODO replace with logging
                     print(f'\tMoving {file}...')
                     #strip filepath from filename
                     file_no_path = file.split('/')[-1]
-                    shutil.move(f'{file}', f'{self.target_directory}/{file_category}/{file_no_path}')
-                    action_count += 1
+                    # check if file is already present in target directory
+                    if os.path.exists(f'{self.target_directory}/{file_category}/{file_no_path}'):
+                        #TODO add setting to overwrite existing files or skip
+                        #TODO replace with logging
+                        print(f'\t{file_no_path} already exists, in {file_category}. Skipping...')
+                        continue
+                    else:
+                        shutil.move(f'{file}', f'{self.target_directory}/{file_category}/{file_no_path}')
+                        action_count += 1
                 else:
                     #TODO replace with logging
                     print(f'\t{file} does not exist, skipping...')
@@ -354,15 +285,25 @@ class FileOrganizer:
             print(f'Archiving {len(file_list)} file(s) to {file_category}.zip...')
             for file in file_list:
                 if os.path.exists(f'{file}'):
-                    #TODO check file already exists in archive
+
+                    #TODO add error handling
                     #TODO replace with logging
                     print(f'\tArchiving {file}...')
+                    # check if file is already present in archive
                     with zipfile.ZipFile(f'{self.target_directory}/{file_category}.zip', 'a') as zip:
-                        #remove absolutepath from filename before zipping
-                        zip.write(f'{file}', arcname=f'{file.split("/")[-1]}')
-                        #remove original file
-                        os.remove(f'{file}')
-                        action_count += 1
+                        if file in zip.namelist():
+                            #TODO add setting to overwrite existing files or skip
+                            #TODO replace with logging
+                            print(f'\t{file} already exists in {file_category}.zip. Skipping...')
+                            zip.close()
+                            continue
+                        else:
+                            #remove absolute path from filename before zipping
+                            zip.write(f'{file}', arcname=f'{file.split("/")[-1]}')
+                            #remove original file
+                            os.remove(f'{file}')
+                            action_count += 1
+                            zip.close()
                 else:
                     #TODO replace with logging
                     print(f'\t{file} does not exist, skipping...')
@@ -383,11 +324,14 @@ class FileOrganizer:
         if self._remove_duplicates:
             duplicates_removed_success = self.remove_duplicates_files()
         if self._archive_files:
-            files_archived_success = self.archive_files(self.extensions_dictionary)
+            files_archived_success = self.archive_files(self.fetcher.create_file_dictionary(self.fetcher.get_file_list(self.fetcher.new_target_directory)))
         elif self._move_files:
             files_moved_sucess = self.move_files(self.fetcher.create_file_dictionary(self.fetcher.get_file_list(self.fetcher.new_target_directory)))
         
-        return duplicates_removed_success and files_archived_success and files_moved_sucess
+        return {"duplicate_files_removed": duplicates_removed_success,
+                "files_archived": files_archived_success,
+                "files_moved_success": files_moved_sucess,
+                "all": duplicates_removed_success and files_archived_success and files_moved_sucess}
         
 class SecurityManager:
     """
@@ -398,9 +342,17 @@ class SecurityManager:
             - running security checks on files before other operations
     """
     
-    
-    def __init__(self):
-        pass
+    def __init__(self, target_directory):
+        self.target_directory = target_directory
+        
+    def check_write_permissions(self, target_directory):
+        """takes directory path as argument
+           returns bool and string"""
+
+        if not os.access(target_directory, os.W_OK):
+             return False, "User does not have write permissions to target directory"
+        else:
+            return True, "User has write permissions to target directory"
 
 class FileIOReporter:
     """
@@ -478,7 +430,7 @@ class FileIOReporter:
 class Main:
     """
     gets arguments from command line
-    creates instances of FileOrganizer
+    creates instances of FileIOReporter, DataFetcher and FileOrganizer
     has run() method that runs the program
     """
     def __init__(self):
@@ -528,7 +480,8 @@ class Main:
             reporter.logger.error("Cannot archive and move at the same time. Please choose one or the other.")
             organizer_sucess = False
         else:
-            organizer_sucess = organizer.organize_files()
+            organizer_sucess = organizer.organize_files()["all"]
+
         if organizer_sucess:
             reporter.logger.info("Finished.")
         else:
