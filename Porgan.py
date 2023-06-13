@@ -7,31 +7,49 @@ import yaml
 import logging
 
 class DataFetcher:
-    # this fetches data for other classes
     """
-    get files list
-    get extensions dictionary from yaml
-    get settings from yaml (target directory)
-    get duplicate files from files list
-    get archive names from extensions dictionary
-
-    parameters:
-        settings_file    (str) - the settings file to get the default target directory from
-        extensions_file  (str) - the extensions file to get the extensions dictionary from
-        target_directory (str) - the target directory to overwrite the default target directory
-            if None, the default target directory will be used
-    """
-    
-    def __init__(self, fileIOreporter, settings_file, extensions_file, target_directory = None ):
+        This class fetches data for other classes. It has the following methods:
+        
+        - _load_yaml(file): loads a yaml file and returns its contents
+        - _set_target_directory(target_directory): sets the target directory. If a target directory is provided as an argument and it exists,
+            it will be used as the new target directory. Otherwise, the default target directory from the settings file will be used.
+        - _get_absolute_file_paths(folder): returns a list of absolute file paths in the given folder
+        - get_app_made_zips(): returns a list of archive names from the extensions dictionary
+        - get_file_list(target_directory): returns a list of all files in the target directory
+        - get_duplicate_files(file_list): finds and returns a list of duplicate files in the given file list
+        
+        Parameters:
+            fileIOreporter   (object) - an object that handles logging and reporting
+            settings_file    (str) - the settings file to get the default target directory from
+            extensions_file  (str) - the extensions file to get the extensions dictionary from
+            target_directory (str) - the target directory to overwrite the default target directory
+                if None, the default target directory will be used
+        """
+    def __init__(self, fileIOreporter, settings_file, path_to_extensions_file, target_directory = None ): 
+        """
+            parameters:
+               - fileIOreporter (object) - an object that handles logging and reporting
+               - settings_file (str) - the settings file to get the default target directory from
+               - extensions_file (str) - the extensions file to get the extensions dictionary from
+               - target_directory (str) - the target directory to overwrite the default target directory
+        """
         self.new_target_directory = ''
         self.reporter = fileIOreporter
         self.settings = self._load_yaml(settings_file)
-        self.extensions_dictionary = self._load_yaml(extensions_file)    
+        self.extensions_dictionary = self._load_yaml(path_to_extensions_file)    
         self._set_target_directory(target_directory)
         self.file_list = self.get_file_list(self.new_target_directory)
+        self.new_file_extensions = []
 
-    def _load_yaml(self, file):
-        with open(file, 'r') as f:
+    def _load_yaml(self, path_to_file):
+        """
+        Loads a yaml file and returns its contents.
+        
+        parameters: path_to_file (str) - the path to the yaml file to load  
+        
+        returns: the contents of the yaml file
+        """
+        with open(path_to_file, 'r') as f:
             #print(f'{yaml.safe_load(f)}')
             return yaml.safe_load(f)
     
@@ -40,39 +58,57 @@ class DataFetcher:
         Sets the target directory. If a target directory is provided as an argument and it exists,
         it will be used as the new target directory. Otherwise, the default target directory from the settings file will be used.
 
-        Parameters:
-            target_directory (str): The target directory to set as the new target directory. If None, the default target directory
-                                    from the settings file will be used.
+        Parameters: target_directory (str): The target directory to set as the new target directory. If None, the default target directory from the settings file will be used.
 
-        Returns:
-            None
+        Returns: None
         """
         if target_directory is not None and os.path.isdir(target_directory) and os.path.exists(target_directory):
             self.reporter.logger.info("Target directory set to:", target_directory)
             self.new_target_directory = target_directory
         else:
             #load default target directory from settings file
-            #print("Settings:", self.settings)
-            self.reporter.logger.info("loading default target directory from settings file...")
+            self.reporter.logger.debug("loading default target directory from settings file...")
             self.new_target_directory = self.settings['target_directory']
-            #print("Target directory:", self.new_target_directory)
 
     def _get_absolute_file_paths(self,folder):
+        """
+        This function returns a list of absolute file paths in the given folder.
+        
+        parameters: folder (str) - the folder to get the absolute file paths from
+        
+        returns: a list of absolute file paths in the given folder
+        """
         files = []
-        for f in os.listdir(folder):
+        for file in os.listdir(folder):
             # if f is a file
-            if os.path.isfile(os.path.join(folder, f)):
-                files.append(os.path.abspath(os.path.join(folder, f)))
+            if os.path.isfile(os.path.join(folder, file)):
+                files.append(os.path.abspath(os.path.join(folder, file)))
         return files  
     
     def get_app_made_zips(self):
+        """
+        This function returns a list of archive names from the extensions dictionary.
+        this is used to prevent the app from moving/zipping its own zip files.
+        
+        parameters: none
+        
+        returns: a list of archive names from the extensions dictionary
+        """
+        #TODO add debug logging to this function
         zips = []
         filenames = list(self.extensions_dictionary.keys())
-        for f in filenames:
-            zips.append(f + '.zip')
+        for file in filenames:
+            zips.append(file + '.zip')
         return zips
     
     def get_file_list(self, target_directory = None):
+        """
+        This function returns a list of all files in the target directory.
+
+        parameters: target_directory (str) - the target directory to get the file list from
+        
+        returns: a list of absolute file paths in the given folder
+        """
         # Get a list of all files in the target directory.
         if target_directory is None:
             print("No target directory set.")
@@ -81,16 +117,18 @@ class DataFetcher:
     
     def get_duplicate_files(self, file_list):
         """
-        Finds and returns a list of duplicate files in the given file list.
+        Finds and returns a list of duplicate files in the given file list using regex patterns.
 
-        Args:
-            file_list (list): A list of file paths to search for duplicates.
+        parameters: file_list (list) - a list of file paths to search for duplicates
 
-        Returns:
-            list: A list of file paths that are duplicates.
+        Returns: list: A list of file paths that match duplicate regex patterns.
 
         """
+        
         #TODO check if original file exists(i.e. file(1).txt and file.txt))
+        #TODO if file matches pattern, but no original exists, rename th file to remove the pattern
+
+        
         # List of patterns to match
         patterns = [
             re.compile(r'.*\(copy\)\.\w+$'),
@@ -111,23 +149,37 @@ class DataFetcher:
                 match = pattern.match(filename)
                 # If there is a match, and the original file exists, add it to the list
                 if match and re.sub(pattern, '', filename) in file_list:
+                    # if there is a match, and the original file exists, add it to the return list
+
+                    self.reporter.logger.debug(f'duplicate: {filename} \n original: {re.sub(pattern, "", filename)} FOUND')
+
                     duplicate_files.append(filename)
                     break
+                elif match:
+                    # if there is a match, but no original file exists, rename the file to remove the pattern
+
+                    self.reporter.logger.debug(f'No original file found for {filename}. Renaming file to remove pattern.')
+
+                    #TODO Test this
+                    new_filename = re.sub(pattern, '', filename)
+                    os.rename(filename, new_filename)
         return duplicate_files
-    
+
     def create_file_dictionary(self, file_list):
         """
-        Creates a dictionary of files based on their file extension category.
+        Creates a dictionary of files where each key is a file category and the value is a list of the files that belong to that category.
+        Saves a list of previously unknown file extensions to self.new_file_extensions. Currently unused. TODO use this to update the extensions dictionary.
 
-        Args:
-            file_list (list): A list of file paths.
-            extensions_category_list (list): A list of dictionaries where each dictionary contains a file extension category as the key and a list of file extensions as the value.
+            parameters: file_list (list): A list of file paths.
+            extensions_category_list (list): A dictionary where each key is a file category and the value is a list of file extensions that belong to that category.
 
         Returns:
-            dict: A dictionary where each key is a file extension category and the value is a list of file paths that belong to that category. Files with unknown file extensions are categorized as 'misc'.
+            dict: A dictionary where each key is a file category and the value is a list of file paths that belong to that category. Files with unknown file extensions are categorized as 'unknown'.
         """
         
         #TODO add contingency for files with no extensions
+        
+        self.reporter.logger.debug("Creating file dictionary...")
 
         file_dictionary = {}
         check_list = []
@@ -139,22 +191,29 @@ class DataFetcher:
             for key, val in self.extensions_dictionary.items():
                 for ext in val:
                     if file.lower().endswith(f'.{ext}'):
-                    #if file.endswith(f'.{ext}'):
                         if key in file_dictionary:
                             file_dictionary[key].append(file)
                         else:
                             file_dictionary[key] = [file]
                         if file not in check_list:
                             check_list.append(file)
-        #handle unknown file types as unknown
+        
+        #Unknowns go in the unknowns category
+        # create list of unknown types for future use
+        unknown_types = []
         for file in file_list:
             if file not in check_list:
                 if 'unknowns' not in file_dictionary:
                     file_dictionary['unknowns'] = [file]
                 else:
                     file_dictionary['unknowns'].append(file)
+                ext = file.split('.')[-1]
+                unknown_types.append(ext)
+                #save list of unknown types for future use
+                self.new_file_extensions = unknown_types
         return file_dictionary
     
+
 class FileOrganizer:
     """
         uses the data from self.data_fetcher to organize the files
@@ -173,6 +232,7 @@ class FileOrganizer:
             move                  (bool): Whether or not to move files.
             remove_duplicates     (bool): Whether or not to remove duplicate files.
     """
+    
     def __init__(self, fileIOreporter, data_fetcher, archive = False, move = False, remove_duplicates = False):
         
         self.fetcher = data_fetcher
@@ -332,7 +392,8 @@ class FileOrganizer:
                 "files_archived": files_archived_success,
                 "files_moved_success": files_moved_sucess,
                 "all": duplicates_removed_success and files_archived_success and files_moved_sucess}
-        
+
+
 class SecurityManager:
     """
         This class will handle security functions such as:
@@ -354,18 +415,19 @@ class SecurityManager:
         else:
             return True, "User has write permissions to target directory"
 
+
 class FileIOReporter:
     """
     this class will handle all logging and dry run functions
 
 
     logging rules:
-        - always log:
+        - always log (info)):
             - start of program
             - start of each function
-            - end of each function
+            - end of each signficant function
             - end of program
-        - log if verbose:
+        - log if verbose (debug):
             - each step of each function
             - each file moved
             - each file archived
@@ -387,6 +449,7 @@ class FileIOReporter:
             - permissions error
 
     """
+   
     def __init__(self, target_directory, move_mode, archive_mode, remove_duplicates_mode, log_level=logging.DEBUG, data_fetcher=None):
         self._dry_move = move_mode
         self._dry_archive = archive_mode
@@ -404,8 +467,6 @@ class FileIOReporter:
 
         self.fetcher = data_fetcher
 
-
-    
     def dry_move(self):
         self.logger.info('Dry run: Moving files...')
         pass
@@ -427,12 +488,14 @@ class FileIOReporter:
             self.dry_move()
         pass
     
+
 class Main:
     """
     gets arguments from command line
     creates instances of FileIOReporter, DataFetcher and FileOrganizer
     has run() method that runs the program
     """
+    
     def __init__(self):
         #get arguments from command line
         parser = argparse.ArgumentParser()
@@ -458,22 +521,21 @@ class Main:
 
         fetcher = DataFetcher( fileIOreporter = reporter, 
                                settings_file = './Settings.yaml', 
-                               extensions_file = './Extensions.yaml', 
+                               path_to_extensions_file = './Extensions.yaml', 
                                target_directory = self.args.target)
 
         reporter.fetcher = fetcher
 
-
         reporter.logger.info("Starting...")
-
 
         organizer = FileOrganizer( fileIOreporter = reporter,
                                    data_fetcher= fetcher,
                                    archive = self.args.archive,
                                    move = self.args.move,
                                    remove_duplicates = self.args.rm_duplicates)
-                
+        
         organizer_sucess = True
+
         if self.args.dry_run:
             reporter.dry_run()
         elif self.args.archive and self.args.move:

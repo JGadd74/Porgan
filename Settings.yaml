@@ -1,2 +1,6 @@
 #default directory if not specified at runtime
 target_directory: './Files/Downloads'
+#delete duplicate files when moving or archiving files
+delete_redundant_files: true
+#delete duplicate files that match duplicate patterns like (1), (2), (copy), etc.
+delete_duplicate_files: true
