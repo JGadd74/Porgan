@@ -38,6 +38,7 @@ class DataFetcher:
         self.settings = self._load_yaml(settings_file)
         self.extensions_dictionary = self._load_yaml(path_to_extensions_file)    
         self._set_target_directory(target_directory)
+        # make file_list getter
         self.file_list = self.get_file_list(self.new_target_directory)
         self.new_file_extensions = []
 
@@ -121,14 +122,12 @@ class DataFetcher:
 
         parameters: file_list (list) - a list of file paths to search for duplicates
 
-        Returns: list: A list of file paths that match duplicate regex patterns.
+        Returns: tuple(list, list<tuple>) - a list of duplicate files and a list of tuples containing the an orphan and its regex pattern
 
         """
         
-        #TODO check if original file exists(i.e. file(1).txt and file.txt))
-        #TODO if file matches pattern, but no original exists, rename th file to remove the pattern
+        #TODO compare files in target_dir with files in app made folders/zips
 
-        
         # List of patterns to match
         patterns = [
             re.compile(r'.*\(copy\)\.\w+$'),
@@ -142,6 +141,7 @@ class DataFetcher:
         ]
 
         duplicate_files = []
+        matches_with_no_original = []
 
         for filename in file_list:
             # Check each pattern
@@ -149,21 +149,17 @@ class DataFetcher:
                 match = pattern.match(filename)
                 # If there is a match, and the original file exists, add it to the list
                 if match and re.sub(pattern, '', filename) in file_list:
-                    # if there is a match, and the original file exists, add it to the return list
+                    # if there is a match, and the original exists, add duplicate file to the return list
 
-                    self.reporter.logger.debug(f'duplicate: {filename} \n original: {re.sub(pattern, "", filename)} FOUND')
+                    self.reporter.logger.debug(f'duplicate: {filename} \n original: {re.sub(pattern, "", filename)}')
 
+                    # append filename to duplicate_files list
                     duplicate_files.append(filename)
                     break
                 elif match:
-                    # if there is a match, but no original file exists, rename the file to remove the pattern
-
-                    self.reporter.logger.debug(f'No original file found for {filename}. Renaming file to remove pattern.')
-
-                    #TODO Test this
-                    new_filename = re.sub(pattern, '', filename)
-                    os.rename(filename, new_filename)
-        return duplicate_files
+                    matches_with_no_original.append(filename, pattern)
+        
+        return duplicate_files, matches_with_no_original
 
     def create_file_dictionary(self, file_list):
         """
@@ -177,8 +173,7 @@ class DataFetcher:
             dict: A dictionary where each key is a file category and the value is a list of file paths that belong to that category. Files with unknown file extensions are categorized as 'unknown'.
         """
         
-        #TODO add contingency for files with no extensions
-        
+ 
         self.reporter.logger.debug("Creating file dictionary...")
 
         file_dictionary = {}
@@ -187,6 +182,8 @@ class DataFetcher:
             #if file has no extension
             if '.' not in file:
                 #do something?
+                # currently gets picked up in the unknowns category
+                # later, check mime/media type for identification.
                 pass
             for key, val in self.extensions_dictionary.items():
                 for ext in val:
@@ -247,137 +244,177 @@ class FileOrganizer:
 
     #create folders for each key in file_dict
     def create_folders(self, file_dict):
-        #if self._verbose_output:
-            #TODO replace with logger
-         #   print('creating folders...')
+
+        self.reporter.logger.debug('Creating folders...')
+        
         folders_created = []
+        
         for key in file_dict.keys():
             # check if folder exists
             if not os.path.exists(f'{self.target_directory}/{key}'):
-                # if not, create folder
-                #if self._verbose_output:
-                    #print(f'\t{key}...')
+                
+                self.reporter.logger.debug(f'\t{key}...')
+                
                 os.mkdir(f'{self.target_directory}/{key}')
+                
                 folders_created.append(key)
-        #if self._verbose_output:
-         #   for f in folders_created:
-          #      print(f'\t{f} folder created.')
+
+        self.reporter.logger.debug(f'Folders created: {len(folders_created)}')
+        
+        return folders_created
 
     #create archives for each key in file_dict
     def create_archives(self, file_dict):
+        self.reporter.logger.debug('Creating archives...')
+
+        archives_created = []
+
         for key in file_dict.keys():
             # check if archive exists
             if not os.path.exists(f'{self.target_directory}/{key}.zip'):
                 # if not, create archive
                 shutil.make_archive(f'{self.target_directory}/{key}', 'zip', f'{self.target_directory}/{key}')
-   
+                
+                archives_created.append(f'{key}.zip')
+                
+                self.reporter.logger.debug(f'\t{key}.zip...')
+        
+        self.reporter.logger.debug(f'Archives created: {len(archives_created)}')
+        
+        return archives_created
+    
+    #rename orphaned duplicate files
+    def rename_orphaned_duplicates(self, orphaned_duplicates):
+        if self.fetcher.settings['rename_orphaned_duplicates'] == True:
+            # TODO add logging
+            for file, pattern in orphaned_duplicates:
+                new_file_name = re.sub(pattern, '', file)
+                os.rename(file, new_file_name)
+        
+
     #safely remove duplicate files
-    def remove_duplicates_files(this):    
+    def remove_duplicates_files(self):   
+        #TODO test orphan renaming
+
         #TODO move files to temp folder and delete later
         #TODO add permanant delete option to settings.yaml
-        #TODO add restore option
-        #TODO rename duplicate with no original
-        #get list of duplicate files
-        duplicates = this.fetcher.get_duplicate_files(this.fetcher.file_list)
-        files_remove = 0
+        #TODO add restore functionionality
+        
+        #get list of duplicate files and orphaned duplicates
+        #duplicates, matched_but_no_originals(tuple(file, pattern))
+        duplicates, orphaned_duplicates = self.fetcher.get_duplicate_files(self.fetcher.file_list)
+
+        files_removed = 0
+        
         if len(duplicates) == 0:
-            #TODO replace with logging
-            print('No duplicate files found.')
+            self.reporter.logging.info('No duplicate files found.')
+
             return
         else:
+            #rename orphaned duplicates if setting["rename_orphaned_duplicates"] is true
+            if self.fetcher.settings['rename_orphaned_duplicates'] == True:
+                self.rename_orphaned_duplicates(orphaned_duplicates)
+            
             #print status
-            #TODO replace with logging
-            print (f"Removing {len(duplicates)} duplicate files...")
+            self.reporter.logging.debug (f"Removing {len(duplicates)} duplicate files...")
+
             for file in duplicates:
                 #safely remove duplicates
                 if os.path.isfile(file):
                     #print file being removed
-                    print(f'\tRemoving {file.split("/")[-1]}...')
+                    self.reporter.logging.debug(f'\tRemoving {file.split("/")[-1]}...')
                     os.remove(file)
-                    files_remove += 1
-        #TODO replace with logging
-        print(f'{files_remove} files removed.')
+                    files_removed += 1
+        
+        self.reporter.logging.info(f'{files_removed} files removed.')
     
     def move_files(self, file_dict):
         all_files_moved = True
         self.create_folders(file_dict)
         file_count = sum(len(value) for value in file_dict.values())
-        #TODO replace with logging
-        print(f'Moving {file_count} files...')
+        self.reporter.logging.info(f'Moving {file_count} files...')
         action_count = 0
         for file_category, file_list in file_dict.items():
-            #TODO replace with logging
-            print(f'Moving {len(file_list)} file(s) to {file_category}...')
+            self.reporter.logging.debug(f'Moving {len(file_list)} file(s) to {file_category}...')
             for file in file_list:
                 if os.path.exists(f'{file}'):
+                    #TODO add more robust error handling
 
-                    #TODO add error handling
-                    #TODO replace with logging
-                    print(f'\tMoving {file}...')
+                    self.reporter.logging.debug(f'\tMoving {file}...')
                     #strip filepath from filename
                     file_no_path = file.split('/')[-1]
                     # check if file is already present in target directory
                     if os.path.exists(f'{self.target_directory}/{file_category}/{file_no_path}'):
                         #TODO add setting to overwrite existing files or skip
-                        #TODO replace with logging
-                        print(f'\t{file_no_path} already exists, in {file_category}. Skipping...')
+                        
+                        self.reporter.logging.info(f'\t{file_no_path} already exists, in {file_category}. Skipping...')
+                        
                         continue
                     else:
-                        shutil.move(f'{file}', f'{self.target_directory}/{file_category}/{file_no_path}')
+                        #TODO test if this works like I think it does
+                        if shutil.move(f'{file}', f'{self.target_directory}/{file_category}/{file_no_path}'):
+                            self.reporter.logging.debug(f'\t{file_no_path} moved successfully.')
                         action_count += 1
                 else:
-                    #TODO replace with logging
-                    print(f'\t{file} does not exist, skipping...')
+                    self.reporter.logging.error(f'\t{file} does not exist, skipping...')
                     all_files_moved = False
-        #TODO replace with logging
-        print(f'{action_count} files moved.')
+        
+        self.reporter.logging.info(f'{action_count} files moved.')
+        self.reporter.logging.debug(f'All files moved: {all_files_moved}')
+        
         return all_files_moved
 
     def archive_files(self, file_dict):
         all_files_archived = True
+
         self.create_archives(file_dict)
+
         file_count = sum(len(value) for value in file_dict.values())
-        #TODO replace with logging
-        print(f'Archiving {file_count} files...')
+        
+        self.reporter.logging.info(f'Archiving {file_count} files...')
+        
         action_count = 0    
+        
         for file_category, file_list in file_dict.items():
-            #TODO replace with logging
-            print(f'Archiving {len(file_list)} file(s) to {file_category}.zip...')
+
+            self.reporter.logging.debug(f'Archiving {len(file_list)} file(s) to {file_category}.zip...')
             for file in file_list:
                 if os.path.exists(f'{file}'):
 
                     #TODO add error handling
-                    #TODO replace with logging
-                    print(f'\tArchiving {file}...')
+                    self.reporter.logging.debug(f'\tArchiving {file}...')
                     # check if file is already present in archive
                     with zipfile.ZipFile(f'{self.target_directory}/{file_category}.zip', 'a') as zip:
                         if file in zip.namelist():
                             #TODO add setting to overwrite existing files or skip
                             #TODO replace with logging
-                            print(f'\t{file} already exists in {file_category}.zip. Skipping...')
+                            self.reporter.logging.info(f'\t{file} already exists in {file_category}.zip. Skipping...')
                             zip.close()
                             continue
                         else:
                             #remove absolute path from filename before zipping
                             zip.write(f'{file}', arcname=f'{file.split("/")[-1]}')
+                            #test
+                            if file in zip.namelist():
+                                self.logging.debug(f'\t{file} archived successfully.')
                             #remove original file
                             os.remove(f'{file}')
                             action_count += 1
                             zip.close()
                 else:
-                    #TODO replace with logging
-                    print(f'\t{file} does not exist, skipping...')
+                    self.reporter.logging.error(f'\t{file} does not exist, skipping...')
                     all_files_archived = False
-        #TODO replace with logging
-        print(f'{action_count} files archived.')
+        self.reporter.logging.info(f'{action_count} files archived.')
+        self.reporter.logging.debug(f'all_files_archived: {all_files_archived}')
         return all_files_archived
 
     def organize_files(self):
         """
-        this function will call the other functions in this class to organize the files
-        return bool to indicate total success or partial to total failure
+        Organizes files based on CLI args
+        if --move-files is passed, files are moved to category folders within target directory
+        if --archive-files is passed, files are archived to category zip files within target directory
+        if --remove-duplicates is passed, duplicate files are removed
         """
-       
         duplicates_removed_success = True
         files_archived_success = True
         files_moved_sucess = True
@@ -388,6 +425,11 @@ class FileOrganizer:
         elif self._move_files:
             files_moved_sucess = self.move_files(self.fetcher.create_file_dictionary(self.fetcher.get_file_list(self.fetcher.new_target_directory)))
         
+        self.reporter.debug(f'duplicates_removed_success: {duplicates_removed_success}')
+        self.reporter.debug(f'files_archived_success: {files_archived_success}')
+        self.reporter.debug(f'files_moved_sucess: {files_moved_sucess}')
+        self.reporter.debug(f'all operations successful: {duplicates_removed_success and files_archived_success and files_moved_sucess}')
+
         return {"duplicate_files_removed": duplicates_removed_success,
                 "files_archived": files_archived_success,
                 "files_moved_success": files_moved_sucess,
@@ -450,34 +492,126 @@ class FileIOReporter:
 
     """
    
-    def __init__(self, target_directory, move_mode, archive_mode, remove_duplicates_mode, log_level=logging.DEBUG, data_fetcher=None):
+    def __init__(self, target_directory, move_mode, archive_mode, remove_duplicates_mode, log_level=logging.INFO, data_fetcher=None):
+        # CLI args...
         self._dry_move = move_mode
         self._dry_archive = archive_mode
         self._dry_remove_duplicates = remove_duplicates_mode        
         
+        # logging setup
         self.logger = logging.getLogger("system_logger")
-
         self.logger.setLevel(log_level)
-
         self.handler = logging.StreamHandler()
         self.formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-
         self.handler.setFormatter(self.formatter)
         self.logger.addHandler(self.handler)
 
+        # data fetcher setup
         self.fetcher = data_fetcher
 
-    def dry_move(self):
-        self.logger.info('Dry run: Moving files...')
-        pass
+    # simulate moving files
+    def dry_move(self, file_dict):
+        # TODO test
+        all_files_moved = True
+        prefix = "Dry run: "
+        folders_created = 0
+        #Simulate creating folders
+        for file_category in file_dict.keys():
+            if not os.path.exists(f'{self.target_directory}/{file_category}'):
+                self.logger.info(f'{prefix}Creating {file_category} folder...')
+                folders_created += 1
+        file_count = sum(len(value) for value in file_dict.values())
+    
+        self.logger.info(f'{prefix}Moving {file_count} files...')
 
-    def dry_archive(self):
-        self.logger.info('Dry run: Archiving files...')
-        pass
+        action_count = 0
 
+        for file_category, file_list in file_dict.items():
+            
+            self.logging.info(f'{prefix}Moving {len(file_list)} file(s) to {file_category}...')
+            for file in file_list:
+                #ensure file still exists
+                if os.path.exists(f'{file}'):
+
+                    self.logging.info(f'\t{prefix}Moving {file}...')
+                    #strip filepath from filename
+                    filename_sans_path = file.split('/')[-1]
+                    # check if file is already present in target directory
+                    if os.path.exists(f'{self.target_directory}/{file_category}/{filename_sans_path}'):
+                        self.logging.info(f'\t{prefix}{filename_sans_path} already exists, in {file_category}. Skipping...')
+                        all_files_moved = False
+                        continue
+                    else:
+                        self.logging.info(f'\t{prefix}Moved {filename_sans_path} to {file_category}.')
+                        action_count += 1
+                else:
+                    self.logging.info(f'\t{prefix}{file} does not exist, skipping...')
+                    all_files_moved = False
+
+        self.logging.info(f'Dry run complete. {folders_created} folders would be created. {action_count} files would moved.')
+        self.logging.info(f'All file operations successful: {all_files_moved}')
+        return all_files_moved
+
+    # simulate archiving files
+    def dry_archive(self, file_dict):
+        # TODO test
+        all_files_archived = True
+        prefix = "Dry run: "
+        archives_created = 0
+        #Simulate creating archives
+        for file_category in file_dict.keys():
+            if not os.path.exists(f'{self.target_directory}/{file_category}.zip'):
+                self.logger.info(f'{prefix}Creating {file_category}.zip...')
+                archives_created += 1
+        file_count = sum(len(value) for value in file_dict.values())
+    
+        self.logger.info(f'{prefix}Archiving{file_count} files...')
+
+        action_count = 0
+
+        for file_category, file_list in file_dict.items():
+            self.logging.info(f'{prefix}Archiving {len(file_list)} file(s) to {file_category}.zip...')
+            for file in file_list:
+                #ensure file still exists
+                if os.path.exists(f'{file}'):
+                    self.logging.info(f'\t{prefix}Archiving {file}...')
+                    # check if file is already present in archive
+                    with zipfile.ZipFile(f'{self.target_directory}/{file_category}.zip', 'a') as zip:
+                        if file in zip.namelist():
+                            print(f'\t{prefix}{file} already exists in {file_category}.zip. Skipping...')
+                            all_files_archived = False
+                            zip.close()
+                            continue
+                        else:
+                            self.logging.info(f'\t{prefix}Archived {file} to {file_category}.zip.')
+                            self.logging.info(f'\t{prefix}Removed original file: {file}.')
+                            action_count += 1
+                            zip.close()
+                else:
+                    self.logging.info(f'\t{prefix}{file} does not exist, skipping...')
+                    all_files_archived = False
+
+        self.logging.info(f'Dry run complete. {archives_created} archives would be created. {action_count} files would archived.')
+        self.logging.info(f'All file operations successful: {all_files_archived}')
+        return all_files_archived
+
+    # simulate duplicate discovery/removal
     def dry_remove_duplicates(self):
-        self.logger.info('Dry run: Removing duplicates...')
-        pass
+        #TODO test
+        prefix = "Dry run: "
+        duplicates = self.fetcher.get_duplicates(self.fetcher.file_list)
+        files_removed = 0
+        if len(duplicates) == 0:
+            self.logging.info("No duplicates found.")
+            return
+        else:
+            self.logging.info(f'{prefix}Removing {len(duplicates)} duplicate files...')
+            for file in duplicates:
+                if os.path.isfile(file):
+                    self.reporter.logging.info(f'\t{prefix}Removing {file.split("/")[-1]}...')
+                    files_removed += 1
+
+        self.reporter.logging.info(f'Dry run complete. {files_removed} files would be removed.')
 
     def dry_run(self):
         if self.dry_remove_duplicates:

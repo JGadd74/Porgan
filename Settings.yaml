@@ -4,3 +4,5 @@ target_directory: './Files/Downloads'
 delete_redundant_files: true
 #delete duplicate files that match duplicate patterns like (1), (2), (copy), etc.
 delete_duplicate_files: true
+#rename files that match duplicate patterns like (1), (2), (copy), etc. but which do not have an original file
+rename_orphaned_duplicates: true
