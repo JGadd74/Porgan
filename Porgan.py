@@ -39,7 +39,7 @@ class DataFetcher:
         self.extensions_dictionary = self._load_yaml(path_to_extensions_file)    
         self._set_target_directory(target_directory)
         # make file_list getter
-        self.file_list = self.get_file_list(self.new_target_directory)
+        self.file_list = self.get_file_list() 
         self.new_file_extensions = []
 
     def _load_yaml(self, path_to_file):
@@ -64,7 +64,7 @@ class DataFetcher:
         Returns: None
         """
         if target_directory is not None and os.path.isdir(target_directory) and os.path.exists(target_directory):
-            self.reporter.logger.info("Target directory set to:", target_directory)
+            self.reporter.logger.info("Target directory set to:", target_directory) # type: ignore
             self.new_target_directory = target_directory
         else:
             #load default target directory from settings file
@@ -102,7 +102,7 @@ class DataFetcher:
             zips.append(file + '.zip')
         return zips
     
-    def get_file_list(self, target_directory = None):
+    def get_file_list(self):
         """
         This function returns a list of all files in the target directory.
 
@@ -111,10 +111,10 @@ class DataFetcher:
         returns: a list of absolute file paths in the given folder
         """
         # Get a list of all files in the target directory.
-        if target_directory is None:
-            print("No target directory set.")
-            return None
-        return [f for f in self._get_absolute_file_paths(target_directory) if f not in self.get_app_made_zips()]
+        if self.new_target_directory == '':
+            self.reporter.logger.error("No target directory provided. Exiting...")
+            exit()
+        return [f for f in self._get_absolute_file_paths(self.new_target_directory) if f not in self.get_app_made_zips()]
     
     def strip_duplicate_pattern(self, file, pattern):
         new_filename = re.sub(pattern, "", file)
@@ -413,7 +413,7 @@ class FileOrganizer:
                             zip.write(f'{file}', arcname=f'{file.split("/")[-1]}')
                             #test
                             if file in zip.namelist():
-                                self.logging.debug(f'\t{file} archived successfully.')
+                                self.reporter.logging.debug(f'\t{file} archived successfully.')
                             #remove original file
                             os.remove(f'{file}')
                             action_count += 1
@@ -443,10 +443,10 @@ class FileOrganizer:
         elif self._move_files:
             files_moved_sucess = self.move_files(self.fetcher.create_file_dictionary(self.fetcher.get_file_list(self.fetcher.new_target_directory)))
         
-        self.reporter.debug(f'duplicates_removed_success: {duplicates_removed_success}')
-        self.reporter.debug(f'files_archived_success: {files_archived_success}')
-        self.reporter.debug(f'files_moved_sucess: {files_moved_sucess}')
-        self.reporter.debug(f'all operations successful: {duplicates_removed_success and files_archived_success and files_moved_sucess}')
+        self.reporter.logger.debug(f'duplicates_removed_success: {duplicates_removed_success}')
+        self.reporter.logger.debug(f'files_archived_success: {files_archived_success}')
+        self.reporter.logger.debug(f'files_moved_sucess: {files_moved_sucess}')
+        self.reporter.logger.debug(f'all operations successful: {duplicates_removed_success and files_archived_success and files_moved_sucess}')
 
         return {"duplicate_files_removed": duplicates_removed_success,
                 "files_archived": files_archived_success,
@@ -509,7 +509,9 @@ class FileIOReporter:
             - permissions error
 
     """
-   
+                                         
+                                                                                                                #TODO remove default value here
+    
     def __init__(self, target_directory, move_mode, archive_mode, remove_duplicates_mode, log_level=logging.INFO, data_fetcher=None):
         # CLI args...
         self._dry_move = move_mode
@@ -532,7 +534,7 @@ class FileIOReporter:
     # simulate moving files
     def dry_move(self, file_dict):
         # TODO test
-        target_directory = self.fetcher.get_target_directory()
+        target_directory = self.fetcher.get_target_directory() #type: ignore
         all_files_moved = True
         prefix = "Dry run: "
         folders_created = 0
@@ -579,7 +581,7 @@ class FileIOReporter:
     def dry_archive(self, file_dict):
         # TODO test
             # run after real run with new files
-        target_directory = self.fetcher.get_target_directory()
+        target_directory = self.fetcher.get_target_directory()#type: ignore
         all_files_archived = True
         prefix = "Dry run: "
         archives_created = 0
@@ -632,7 +634,7 @@ class FileIOReporter:
     def dry_remove_duplicates(self):
         #TODO test
         prefix = "Dry run: "
-        duplicates, orphaned_duplicates = self.fetcher.get_duplicate_files(self.fetcher.file_list)
+        duplicates, orphaned_duplicates = self.fetcher.get_duplicate_files(self.fetcher.file_list)#type: ignore
         
         files_removed = 0
         if len(duplicates) == 0:
@@ -640,7 +642,7 @@ class FileIOReporter:
             return
         else:
             #simulate renaming orphaned duplicates
-            if self.fetcher.settings['rename_orphaned_duplicates'] == True:
+            if self.fetcher.settings['rename_orphaned_duplicates'] == True:#type: ignore
 
                 self.logger.info(f'{prefix}Renaming {len(orphaned_duplicates)} orphaned duplicates...')
 
@@ -648,7 +650,7 @@ class FileIOReporter:
                     
                     if os.path.isfile(file):
                                                 
-                        new_filename = self.fetcher.strip_duplicate_pattern(file, pattern)
+                        new_filename = self.fetcher.strip_duplicate_pattern(file, pattern)#type: ignore
                         file = os.path.basename(file)
                         new_filename = os.path.basename(new_filename)
                         self.logger.info(f'\tRenaming {file} to: {new_filename}...')
@@ -665,13 +667,14 @@ class FileIOReporter:
     def dry_run(self):
         #TODO make dry run results persistent across dry runs, 
         #     i.e. files removed/renamed by dry_remove_duplicates should not appear in subsequent dry runs
+        #TODO make messaging more consistent
 
         if self._dry_remove_duplicates:
             self.dry_remove_duplicates()
         if self._dry_archive:
-            self.dry_archive(self.fetcher.create_file_dictionary(self.fetcher.get_file_list(self.fetcher.new_target_directory)))
+            self.dry_archive(self.fetcher.create_file_dictionary(self.fetcher.get_file_list()))#type: ignore
         elif self._dry_move:
-            self.dry_move(self.fetcher.create_file_dictionary(self.fetcher.get_file_list(self.fetcher.new_target_directory)))
+            self.dry_move(self.fetcher.create_file_dictionary(self.fetcher.get_file_list()))#type: ignore
         pass
     
 
