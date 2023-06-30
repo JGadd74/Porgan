@@ -116,6 +116,11 @@ class DataFetcher:
             return None
         return [f for f in self._get_absolute_file_paths(target_directory) if f not in self.get_app_made_zips()]
     
+    def strip_duplicate_pattern(self, file, pattern):
+        new_filename = re.sub(pattern, "", file)
+        new_filename = new_filename.replace(" ", "")
+        return new_filename
+    
     def get_duplicate_files(self, file_list):
         """
         Finds and returns a list of duplicate files in the given file list using regex patterns.
@@ -135,7 +140,8 @@ class DataFetcher:
             #(Copy)
             re.compile(r'\(Copy\)(?=\.\w+$)'),
             #(n)
-            re.compile(r'\(\d+\)(?=\.\w+$)'),
+            #re.compile(r'\(\d+\)(?=\.\w+$)'),
+            re.compile(r'\(\d+\)'),
             #(nst copy)
             re.compile(r'\((?:[02-9]|[1-9](?<!1)\d*)1st copy\)'),
             #(nnd copy)
@@ -155,17 +161,17 @@ class DataFetcher:
                 #match = pattern.match(filename)
                 match = re.search(pattern, filename)
                 # If there is a match, and the original file exists, add it to the list
-                if match and re.sub(pattern, '', filename).rstrip() in file_list:
+                if match and self.strip_duplicate_pattern(filename, pattern) in file_list:
                     # if there is a match, and the original exists, add duplicate file to the return list
 
-                    self.reporter.logger.debug(f'duplicate: {filename} \n\t\t\t original: {re.sub(pattern, "", filename)}')
-
-                    # append filename to duplicate_files list
                     duplicate_files.append(filename)
+                    filename = os.path.basename(filename)
+                    self.reporter.logger.debug(f'duplicate: {filename} \n\t\t\t original:  {self.strip_duplicate_pattern(filename, pattern)}')
                     break
                 elif match:
-                    self.reporter.logger.debug(f'Orphan duplicate found: {filename}')
                     matches_with_no_original.append((filename, pattern))
+                    filename = os.path.basename(filename)
+                    self.reporter.logger.debug(f'Orphan duplicate found: {filename}')
         
         return duplicate_files, matches_with_no_original
 
@@ -621,10 +627,10 @@ class FileIOReporter:
         self.logger.info(f'All file operations successful: {all_files_archived}')
         return all_files_archived
 
+    
     # simulate duplicate discovery/removal
     def dry_remove_duplicates(self):
         #TODO test
-        #TODO add duplicate renaming
         prefix = "Dry run: "
         duplicates, orphaned_duplicates = self.fetcher.get_duplicate_files(self.fetcher.file_list)
         
@@ -634,24 +640,32 @@ class FileIOReporter:
             return
         else:
             #simulate renaming orphaned duplicates
-            """ if self.fetcher.settings['rename_orphaned_duplicates'] == True:
+            if self.fetcher.settings['rename_orphaned_duplicates'] == True:
 
                 self.logger.info(f'{prefix}Renaming {len(orphaned_duplicates)} orphaned duplicates...')
 
                 for file, pattern in orphaned_duplicates:
+                    
                     if os.path.isfile(file):
-                        self.logger.info(f'\tRenaming {file} to: {re.sub(file, "", pattern)}...')
-             """
+                                                
+                        new_filename = self.fetcher.strip_duplicate_pattern(file, pattern)
+                        file = os.path.basename(file)
+                        new_filename = os.path.basename(new_filename)
+                        self.logger.info(f'\tRenaming {file} to: {new_filename}...')
+            
             #simulate removing duplicates
             self.logger.info(f'{prefix}Removing {len(duplicates)} duplicate files...')
             for file in duplicates:
                 if os.path.isfile(file):
-                    self.logger.info(f'\t{prefix}Removing {file.split("/")[-1]}...')
+                    self.logger.info(f'\tRemoving {file.split("/")[-1]}...')
                     files_removed += 1
 
         self.logger.info(f'Dry run complete. {files_removed} files would be removed.')
 
     def dry_run(self):
+        #TODO make dry run results persistent across dry runs, 
+        #     i.e. files removed/renamed by dry_remove_duplicates should not appear in subsequent dry runs
+
         if self._dry_remove_duplicates:
             self.dry_remove_duplicates()
         if self._dry_archive:
