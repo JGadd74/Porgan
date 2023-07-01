@@ -227,6 +227,7 @@ class DataFetcher:
     def get_target_directory(self):
         return self.new_target_directory
 
+
 class FileOrganizer:
     """
         uses the data from self.data_fetcher to organize the files
@@ -307,105 +308,126 @@ class FileOrganizer:
                 new_file_name = re.sub(pattern, '', file)
                 os.rename(file, new_file_name)
         
-    #safely remove duplicate files
+    #safely remove/rename duplicate files
     def remove_duplicates_files(self):   
         #TODO test orphan renaming
 
         #TODO move files to temp folder and delete later
         #TODO add permanant delete option to settings.yaml
         #TODO add restore functionionality
+        #TODO add return value for success/failure
         
         #get list of duplicate files and orphaned duplicates
-        #duplicates, matched_but_no_originals(tuple(file, pattern))
+        #duplicates, orphans(tuple(file, pattern))
         duplicates, orphaned_duplicates = self.fetcher.get_duplicate_files(self.fetcher.file_list)
 
         files_removed = 0
+        files_renamed = 0
         
-        if len(duplicates) == 0:
-            self.reporter.logging.info('No duplicate files found.')
-
+        #If there are no duplicates, return
+        if len(duplicates) == 0 and len(orphaned_duplicates) == 0:
+            self.reporter.logger.info('No duplicate files found.')
             return
+        #if there are duplicates
         else:
-            #rename orphaned duplicates if setting["rename_orphaned_duplicates"] is true
-            if self.fetcher.settings['rename_orphaned_duplicates'] == True:
-                self.rename_orphaned_duplicates(orphaned_duplicates)
-            
-            #print status
-            self.reporter.logging.debug (f"Removing {len(duplicates)} duplicate files...")
+            #if no settings are enabled, return
+            if self.fetcher.settings['rename_orphaned_duplicates'] == False and self.fetcher.settings['delete_duplicate_files'] == False:
+                self.reporter.logger.info('No action taken. Please enable rename_orphaned_duplicates or delete_duplicate_files in settings.yaml.')
+                return
+            #rename orphaned duplicates if setting["rename_orphaned_duplicates"] is true and there are orphaned duplicates
+            if self.fetcher.settings['rename_orphaned_duplicates'] == True and len(orphaned_duplicates) > 0:
+                self.logger.info(f'Renaming {len(orphaned_duplicates)} orphaned duplicate files...')
+                #self.rename_orphaned_duplicates(orphaned_duplicates)
+                for file, pattern in orphaned_duplicates:
+                    #safely rename orphaned duplicate
+                    if os.path.isfile(file):
+                        new_filename = self.fetcher.strip_duplicate_pattern(file, pattern)
 
-            for file in duplicates:
-                #safely remove duplicates
-                if os.path.isfile(file):
-                    #print file being removed
-                    self.reporter.logging.debug(f'\tRemoving {file.split("/")[-1]}...')
-                    os.remove(file)
-                    files_removed += 1
+                        self.reporter.logger.debug(f'\tRenaming {os.path.basename(file)} to {os.path.basename(new_filename)}...')
+                        os.rename(file, new_filename)
+                        files_renamed += 1
+                self.reporter.logger.info(f'{files_renamed} files renamed.')
+            
+            #if setting['delete_duplicate_files] there are duplicate files to remove
+            if self.fetcher.settings['delete_duplicate_files'] and len(duplicates) > 0:
+                #print duplicate removal status
+                self.reporter.logger.info (f"Removing {len(duplicates)} duplicate files...")
+
+                for file in duplicates:
+                    #safely remove duplicate
+                    if os.path.isfile(file):
+                        #print file being removed
+                        self.reporter.logger.debug(f'\tRemoving {os.path.basename(file)}...')
+                        os.remove(file)
+                        files_removed += 1
         
-        self.reporter.logging.info(f'{files_removed} files removed.')
+                self.reporter.logger.info(f'{files_removed} files removed.')
     
     #move files into folders
     def move_files(self, file_dict):
+        #TODO consistent messages
         all_files_moved = True
         self.create_folders(file_dict)
         file_count = sum(len(value) for value in file_dict.values())
-        self.reporter.logging.info(f'Moving {file_count} files...')
+        self.reporter.logger.info(f'Moving {file_count} files...')
         action_count = 0
         for file_category, file_list in file_dict.items():
-            self.reporter.logging.debug(f'Moving {len(file_list)} file(s) to {file_category}...')
+            self.reporter.logger.debug(f'Moving {len(file_list)} file(s) to {file_category}...')
             for file in file_list:
                 if os.path.exists(f'{file}'):
                     #TODO add more robust error handling
 
-                    self.reporter.logging.debug(f'\tMoving {file}...')
+                    self.reporter.logger.debug(f'\tMoving {file}...')
                     #strip filepath from filename
                     file_no_path = file.split('/')[-1]
                     # check if file is already present in target directory
                     if os.path.exists(f'{self.target_directory}/{file_category}/{file_no_path}'):
                         #TODO add setting to overwrite existing files or skip
                         
-                        self.reporter.logging.info(f'\t{file_no_path} already exists, in {file_category}. Skipping...')
+                        self.reporter.logger.info(f'\t{file_no_path} already exists, in {file_category}. Skipping...')
                         
                         continue
                     else:
                         #TODO test if this works like I think it does
                         if shutil.move(f'{file}', f'{self.target_directory}/{file_category}/{file_no_path}'):
-                            self.reporter.logging.debug(f'\t{file_no_path} moved successfully.')
+                            self.reporter.logger.debug(f'\t{file_no_path} moved successfully.')
                         action_count += 1
                 else:
-                    self.reporter.logging.error(f'\t{file} does not exist, skipping...')
+                    self.reporter.logger.error(f'\t{file} does not exist, skipping...')
                     all_files_moved = False
         
-        self.reporter.logging.info(f'{action_count} files moved.')
-        self.reporter.logging.debug(f'All files moved: {all_files_moved}')
+        self.reporter.logger.info(f'{action_count} files moved.')
+        self.reporter.logger.debug(f'All files moved: {all_files_moved}')
         
         return all_files_moved
 
     #compress files into archives
     def archive_files(self, file_dict):
+        #TODO consistent messages
         all_files_archived = True
 
         self.create_archives(file_dict)
 
         file_count = sum(len(value) for value in file_dict.values())
         
-        self.reporter.logging.info(f'Archiving {file_count} files...')
+        self.reporter.logger.info(f'Archiving {file_count} files...')
         
         action_count = 0    
         
         for file_category, file_list in file_dict.items():
 
-            self.reporter.logging.debug(f'Archiving {len(file_list)} file(s) to {file_category}.zip...')
+            self.reporter.logger.debug(f'Archiving {len(file_list)} file(s) to {file_category}.zip...')
             for file in file_list:
                 if os.path.exists(f'{file}'):
 
                     #TODO add error handling
-                    self.reporter.logging.debug(f'\tArchiving {file}...')
+                    self.reporter.logger.debug(f'\tArchiving {file}...')
                     # check if file is already present in archive
                     with zipfile.ZipFile(f'{self.target_directory}/{file_category}.zip', 'a') as zip:
                         if file in zip.namelist():
                             #TODO add setting to overwrite existing files or skip
                             #TODO replace with logging
-                            self.reporter.logging.info(f'\t{file} already exists in {file_category}.zip. Skipping...')
+                            self.reporter.logger.info(f'\t{file} already exists in {file_category}.zip. Skipping...')
                             zip.close()
                             continue
                         else:
@@ -413,16 +435,16 @@ class FileOrganizer:
                             zip.write(f'{file}', arcname=f'{file.split("/")[-1]}')
                             #test
                             if file in zip.namelist():
-                                self.reporter.logging.debug(f'\t{file} archived successfully.')
+                                self.reporter.logger.debug(f'\t{file} archived successfully.')
                             #remove original file
                             os.remove(f'{file}')
                             action_count += 1
                             zip.close()
                 else:
-                    self.reporter.logging.error(f'\t{file} does not exist, skipping...')
+                    self.reporter.logger.error(f'\t{file} does not exist, skipping...')
                     all_files_archived = False
-        self.reporter.logging.info(f'{action_count} files archived.')
-        self.reporter.logging.debug(f'all_files_archived: {all_files_archived}')
+        self.reporter.logger.info(f'{action_count} files archived.')
+        self.reporter.logger.debug(f'all_files_archived: {all_files_archived}')
         return all_files_archived
 
     #organize files based on CLI args
@@ -441,7 +463,7 @@ class FileOrganizer:
         if self._archive_files:
             files_archived_success = self.archive_files(self.fetcher.create_file_dictionary(self.fetcher.get_file_list(self.fetcher.new_target_directory)))
         elif self._move_files:
-            files_moved_sucess = self.move_files(self.fetcher.create_file_dictionary(self.fetcher.get_file_list(self.fetcher.new_target_directory)))
+            files_moved_sucess = self.move_files(self.fetcher.create_file_dictionary(self.fetcher.get_file_list()))
         
         self.reporter.logger.debug(f'duplicates_removed_success: {duplicates_removed_success}')
         self.reporter.logger.debug(f'files_archived_success: {files_archived_success}')
@@ -510,7 +532,6 @@ class FileIOReporter:
 
     """
                                          
-                                                                                                                #TODO remove default value here
     
     def __init__(self, target_directory, move_mode, archive_mode, remove_duplicates_mode, log_level=logging.INFO, data_fetcher=None):
         # CLI args...
@@ -629,7 +650,6 @@ class FileIOReporter:
         self.logger.info(f'All file operations successful: {all_files_archived}')
         return all_files_archived
 
-    
     # simulate duplicate discovery/removal
     def dry_remove_duplicates(self):
         #TODO test
@@ -637,6 +657,7 @@ class FileIOReporter:
         duplicates, orphaned_duplicates = self.fetcher.get_duplicate_files(self.fetcher.file_list)#type: ignore
         
         files_removed = 0
+
         if len(duplicates) == 0:
             self.logger.info("No duplicates found.")
             return
