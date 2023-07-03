@@ -461,7 +461,7 @@ class FileOrganizer:
         if self._remove_duplicates:
             duplicates_removed_success = self.remove_duplicates_files()
         if self._archive_files:
-            files_archived_success = self.archive_files(self.fetcher.create_file_dictionary(self.fetcher.get_file_list(self.fetcher.new_target_directory)))
+            files_archived_success = self.archive_files(self.fetcher.create_file_dictionary(self.fetcher.get_file_list()))
         elif self._move_files:
             files_moved_sucess = self.move_files(self.fetcher.create_file_dictionary(self.fetcher.get_file_list()))
         
@@ -474,28 +474,6 @@ class FileOrganizer:
                 "files_archived": files_archived_success,
                 "files_moved_success": files_moved_sucess,
                 "all": duplicates_removed_success and files_archived_success and files_moved_sucess}
-
-
-class SecurityManager:
-    """
-        This class will handle security functions such as:
-            - checking if the user has permission to access the target directory
-            - checking if the user has permission to access the extensions file
-            - checking if the user has permission to access the settings file
-            - running security checks on files before other operations
-    """
-    
-    def __init__(self, target_directory):
-        self.target_directory = target_directory
-        
-    def check_write_permissions(self, target_directory):
-        """takes directory path as argument
-           returns bool and string"""
-
-        if not os.access(target_directory, os.W_OK):
-             return False, "User does not have write permissions to target directory"
-        else:
-            return True, "User has write permissions to target directory"
 
 
 class FileIOReporter:
@@ -650,7 +628,7 @@ class FileIOReporter:
         self.logger.info(f'All file operations successful: {all_files_archived}')
         return all_files_archived
 
-    # simulate duplicate discovery/removal
+    # simulate duplicate discovery/removal/renaming
     def dry_remove_duplicates(self):
         #TODO test
         prefix = "Dry run: "
@@ -685,6 +663,7 @@ class FileIOReporter:
 
         self.logger.info(f'Dry run complete. {files_removed} files would be removed.')
 
+    # orchestrate dry run
     def dry_run(self):
         #TODO make dry run results persistent across dry runs, 
         #     i.e. files removed/renamed by dry_remove_duplicates should not appear in subsequent dry runs
