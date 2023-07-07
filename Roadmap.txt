@@ -1,6 +1,6 @@
-This is a map of the intended functionality and features of Python One-Click Downloads Organizer (POCD) (Pyorgan??) (name in-progress)
+This is a map of the intended functionality and features of Porgan, Python Organizer
 
-POCD is a command-line version of OCD written in python instead of the original C#.
+Porgan is a command-line version of OCD written in python instead of the original C#.
 
             
             
@@ -16,10 +16,6 @@ compress                          x
 cross plat                        x
 dry-run                           x
 usr defined categories            x
-
-
-
-
 
 
 Functionality: 
@@ -61,7 +57,7 @@ Functionality:
             -s             x
             -a             x   
             -d             x
-            -t, --target    x
+            -t, --target   x
             --new
             --list
             --dry-run      x
@@ -72,13 +68,13 @@ Functionality:
             -s 
             -a             x
             -d             x
-            -t, --target 
+            -t, --target   x
             --new
             --list
             --dry-run      x
             -m, --move     x
-            -h, --help
-            -v, --verbose
+            -h, --help     x
+            -v, --verbose  x
         Organizes
             into boiler categories      x
             into custom categories 
@@ -99,23 +95,9 @@ Functionality:
             From archives
 
 
-Functions:
-    move_files
-        create_file_dictionary 
-        create_folders
-    archive_files 
-        create_file_dictionary
-        create_archives
-    remove_duplicate_files
-        get_duplicate_files
-    run_security_checks
-        
 
 bugs:
-     Some file extensions exist in more than one category
-     so files get sorted into the wrong folder depending
-     on the order that the categories are listed 
-        FIXED
+     
     
 
             
