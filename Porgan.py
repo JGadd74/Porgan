@@ -3,6 +3,7 @@ getting arguments from the command line, creating instances of FileIOReporter,
 DataFetcher and FileOrganizer, and running the program."""
 import argparse
 import logging
+import os
 from modules.data_fetcher import DataFetcher
 from modules.file_io_reporter import FileIOReporter
 from modules.file_organizer import FileOrganizer
@@ -25,17 +26,14 @@ class Main:
                             help='Moves files to their respective folders based on their file extension.')
         parser.add_argument('-d', '--rm-duplicates', action='store_true',
                             help='Remove duplicate files.')
-        parser.add_argument('-s', '--secure', action='store_true',
-                            help='Run security checks on files, quarantines suspicious files')
         parser.add_argument('--dry-run', action='store_true',
                             help='Simulate running the program without actually moving/removing files')
         parser.add_argument('-v', '--verbose', action='store_true',
                             help='Displays verbose output')
-        parser.add_argument('-t', '--target', type=str,
+        parser.add_argument('-t', '--target', type=str, 
                             help='Target directory to organize. Default is /home/user/Downloads')
         parser.add_argument('-u', '--unpack', action='store_true',
                             help='Unpacks all previously sorted archives/folders in the target directory')
-        
         self.args = parser.parse_args()
 
     def run(self):
@@ -45,10 +43,11 @@ class Main:
                                     self.args.archive,
                                     self.args.rm_duplicates,
                                     logging.DEBUG if self.args.verbose else logging.INFO)
-        
+        path_to_yamls = os.path.dirname(os.path.abspath(__file__)) + "/etc"
+
         fetcher = DataFetcher(file_io_reporter=reporter,
-                                settings_file='./etc/Settings.yaml',
-                                path_to_extensions_file='./etc/Extensions.yaml',
+                                settings_file=f'{path_to_yamls}/Settings.yaml',
+                                path_to_extensions_file=f'{path_to_yamls}/Extensions.yaml',
                                 target_directory=self.args.target)
         
         reporter.fetcher = fetcher
@@ -62,13 +61,15 @@ class Main:
         operations_ran_without_error = True
         
         reporter.logger.info("Starting...")
-
+        
         if self.args.dry_run:
             reporter.dry_run()
         elif self.args.archive and self.args.move:
             reporter.logger.error("Cannot archive and move at the same time. Please choose one or the other.")
             operations_ran_without_error = False
         else:
+            if self.args.unpack:
+                organizer.unpack()
             operations_ran_without_error = organizer.organize_files()["all"]
 
         if operations_ran_without_error:

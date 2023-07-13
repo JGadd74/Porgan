@@ -5,6 +5,7 @@ import os
 import zipfile
 import shutil
 import re
+from typing import List
 
 
 class FileOrganizer:
@@ -285,3 +286,39 @@ class FileOrganizer:
                 "files_archived": files_archived_success,
                 "files_moved_success": files_moved_sucess,
                 "all": duplicates_removed_success and files_archived_success and files_moved_sucess}
+
+
+    def unpack(self, list_of_targets = None):
+        """This function unpacks all folders and zips in the target directory
+           This is useful to essentially undo the work of the organize_files function"""
+
+
+        targets = []
+
+        if list_of_targets is not None:
+            targets = list_of_targets
+        else:
+            zips,folders = self.fetcher.get_existing_containers()
+            targets = zips + folders
+        for target in targets:
+            print(target)
+        
+            if target.endswith('.zip'):
+                target = f'{self.target_directory}/{target}'
+                with zipfile.ZipFile( target, 'r') as zipf:
+                    zipf.extractall(f'{self.target_directory}')
+                    zipf.close()
+            else:
+                #go through each folder and move the files back to the taraget directory
+                for file in os.listdir(f'{self.target_directory}/{target}'):
+                    if os.path.exists(f'{self.target_directory}/{file}'):
+                        os.remove(f'{self.target_directory}/{file}')
+                    shutil.move(f"{self.target_directory}/{target}/{file}", self.target_directory)
+               
+        #Delete all folders and archives
+        print("Deleting folders and archives...")
+        for target in targets:
+            if target.endswith('.zip'):
+                os.remove(f'{self.target_directory}/{target}')
+            else:
+                os.rmdir(f'{self.target_directory}/{target}')

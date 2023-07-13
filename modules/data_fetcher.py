@@ -50,7 +50,7 @@ class DataFetcher:
         Returns: None
         """
         if target_directory is not None and os.path.isdir(target_directory) and os.path.exists(target_directory):
-            self.reporter.logger.info("Target directory set to:", target_directory) # type: ignore
+            self.reporter.logger.info(f"Target directory set to: {target_directory}")
             self._new_target_directory = target_directory
         else:
             #load default target directory from settings file
@@ -98,6 +98,37 @@ class DataFetcher:
         """
         folder_names = list(self.extensions_dictionary.keys())
         return folder_names
+
+    def get_existing_containers(self):
+        """this function returns a tuple of all
+            folders and zip files made by 
+            this application"""
+        
+        zips = []
+        folders = []
+
+        category_names = list(self.extensions_dictionary.keys())
+        category_names.append('unknowns')
+        
+        #get all items in target directory
+        for item in os.listdir(self._new_target_directory):
+            
+            #for type (dir/file) checking
+            item_with_path = os.path.abspath(f'{self._new_target_directory}/{item}')
+
+            if os.path.isdir(item_with_path):
+                if item in category_names:
+                    print("found folder:", item)
+                    folders.append(item)
+
+            if os.path.isfile(item_with_path):
+                item_sans_extension = os.path.basename(os.path.splitext(item)[0])
+                if item_sans_extension in category_names and item.endswith('.zip'):
+                    print("found zip:", item)
+                    zips.append(item)
+                
+        return zips, folders
+    
 
     def get_file_list(self):
         """
