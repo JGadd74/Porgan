@@ -113,23 +113,22 @@ class DataFetcher:
         #get all items in target directory
         for item in os.listdir(self._new_target_directory):
             
-            #for type (dir/file) checking
+            #used for determining item type (dir/file) checking
             item_with_path = os.path.abspath(f'{self._new_target_directory}/{item}')
 
             if os.path.isdir(item_with_path):
                 if item in category_names:
-                    print("found folder:", item)
+                    self.reporter.logger.debug(f"found folder: {item}")
                     folders.append(item)
 
             if os.path.isfile(item_with_path):
                 item_sans_extension = os.path.basename(os.path.splitext(item)[0])
                 if item_sans_extension in category_names and item.endswith('.zip'):
-                    print("found zip:", item)
+                    self.reporter.logger.debug(f"found zip: {item}")
                     zips.append(item)
                 
         return zips, folders
     
-
     def get_file_list(self):
         """
         This function returns a list of all files in the target directory.
