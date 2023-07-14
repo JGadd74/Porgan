@@ -5,7 +5,6 @@ import os
 import zipfile
 import shutil
 import re
-from typing import List
 
 
 class FileOrganizer:
@@ -128,7 +127,7 @@ class FileOrganizer:
             for file, pattern in orphaned_duplicates:
                 #safely rename orphaned duplicate
                 if os.path.isfile(file):
-                    new_filename = self.fetcher.strip_duplicate_pattern(file, pattern)
+                    new_filename = self.fetcher.strip_regex_pattern(file, pattern)
 
                     self.reporter.logger.debug(f'\tRenaming {os.path.basename(file)} to {os.path.basename(new_filename)}...')
                     os.rename(file, new_filename)
@@ -191,7 +190,7 @@ class FileOrganizer:
                     
                      #TODO replace this with try/except
                     if shutil.move(f'{file}', f'{self.target_directory}/{file_category}/{file_no_path}'):
-                        self.reporter.logger.debug(f'\t{file_no_path} moved successfully.')
+                        self.reporter.logger.debug('\t(sucess)')
                     action_count += 1
                 else:
                     self.reporter.logger.error(f'\t{file} does not exist, skipping...')
@@ -292,7 +291,8 @@ class FileOrganizer:
         """This function unpacks all folders and zips in the target directory
            This is useful to essentially undo the work of the organize_files function"""
 
-
+        #TODO use logging instead of print
+        
         targets = []
 
         if list_of_targets is not None:
@@ -300,12 +300,15 @@ class FileOrganizer:
         else:
             zips,folders = self.fetcher.get_existing_containers()
             targets = zips + folders
+        
+        self.reporter.logger.info(f'Unpacking {len(targets)} containers...')
+        
         for target in targets:
-            print(target)
         
             if target.endswith('.zip'):
                 target = f'{self.target_directory}/{target}'
                 with zipfile.ZipFile( target, 'r') as zipf:
+                    self.reporter.logger.debug(f'Extracting {len(zipf.namelist())} files from {target}...')
                     zipf.extractall(f'{self.target_directory}')
                     zipf.close()
             else:
@@ -316,9 +319,15 @@ class FileOrganizer:
                     shutil.move(f"{self.target_directory}/{target}/{file}", self.target_directory)
                
         #Delete all folders and archives
-        print("Deleting folders and archives...")
-        for target in targets:
-            if target.endswith('.zip'):
-                os.remove(f'{self.target_directory}/{target}')
-            else:
-                os.rmdir(f'{self.target_directory}/{target}')
+        if len(targets) > 0:
+
+            self.reporter.logger.info("Running cleanup...")
+            
+            for target in targets:
+                if target.endswith('.zip'):
+                    self.reporter.logger.debug(f'Deleting {target}...')
+                    os.remove(f'{self.target_directory}/{target}')
+                else:
+                    self.reporter.logger.debug(f'Deleting {target}...')
+                    os.rmdir(f'{self.target_directory}/{target}')
+            self.reporter.logger.debug('Cleanup complete.\n')
