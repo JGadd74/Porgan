@@ -30,10 +30,11 @@ class Main:
                             help='Simulate running the program without actually moving/removing files')
         parser.add_argument('-v', '--verbose', action='store_true',
                             help='Displays verbose output')
-        parser.add_argument('-t', '--target', type=str, 
+        parser.add_argument('-t', '--target', type=str,
                             help='Target directory to organize. Default is /home/user/Downloads')
-        parser.add_argument('-u', '--unpack', action='store_true',
-                            help='Unpacks all previously sorted archives/folders in the target directory')
+        parser.add_argument('-u', '--unpack', nargs='*', default=False,
+                            help='Unpacks all previously sorted archives/folders in the target directory. '
+                                 'If a number is provided, unpacks that many archives/folders.')
         self.args = parser.parse_args()
 
     def run(self):
@@ -43,6 +44,7 @@ class Main:
                                     self.args.archive,
                                     self.args.rm_duplicates,
                                     logging.DEBUG if self.args.verbose else logging.INFO)
+        
         path_to_yamls = os.path.dirname(os.path.abspath(__file__)) + "/etc"
 
         fetcher = DataFetcher(file_io_reporter=reporter,
@@ -68,8 +70,11 @@ class Main:
             reporter.logger.error("Cannot archive and move at the same time. Please choose one or the other.")
             operations_ran_without_error = False
         else:
-            if self.args.unpack:
-                organizer.unpack()
+            if isinstance(self.args.unpack, list):
+                if len(self.args.unpack) == 0:
+                    organizer.unpack()
+                else:
+                    organizer.unpack(self.args.unpack)
             operations_ran_without_error = organizer.organize_files()["all"]
 
         if operations_ran_without_error:

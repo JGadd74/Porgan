@@ -69,7 +69,11 @@ class DataFetcher:
         for file in os.listdir(folder):
             # if f is a file
             if os.path.isfile(os.path.join(folder, file)):
-                files.append(os.path.abspath(os.path.join(folder, file)))
+                # if f is not a zip file made by this app
+                no_fly_list = self.get_app_made_zips()
+                no_fly_list.append('unknowns.zip')
+                if file not in no_fly_list:
+                    files.append(os.path.abspath(os.path.join(folder, file)))
         return files
     
     def get_app_made_zips(self):
@@ -183,7 +187,7 @@ class DataFetcher:
         duplicate_files = []
         matches_with_no_original = []
 
-        for filename in file_list:
+        for filename in self.get_file_list():
             # Check each pattern
             for pattern in patterns:
                 #match = pattern.match(filename)
@@ -221,6 +225,7 @@ class DataFetcher:
         file_dictionary = {}
         check_list = []
         for file in file_list:
+
             #if file has no extension
             if '.' not in file:
                 #do something?
@@ -229,7 +234,7 @@ class DataFetcher:
                 pass
             for key, val in self.extensions_dictionary.items():
                 for ext in val:
-                    if file.lower().endswith(f'.{ext}'):
+                    if file.lower().endswith(f'.{ext.lower()}'):
                         if key in file_dictionary:
                             file_dictionary[key].append(file)
                         else:
