@@ -34,7 +34,7 @@ class Main:
                             help='Target directory to organize. Default is /home/user/Downloads')
         parser.add_argument('-u', '--unpack', nargs='*', default=False,
                             help='Unpacks all previously sorted archives/folders in the target directory. '
-                                 'If a number is provided, unpacks that many archives/folders.')
+                                 'If specific folders/archives are specified, only those will be unpacked.')
         self.args = parser.parse_args()
 
     def run(self):
