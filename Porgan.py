@@ -16,6 +16,10 @@ class Main:
     has run() method that runs the program
     """
 
+    custom_extensions_help_msg = "To create a custom extensions file, copy the default extensions file and modify it as needed. " \
+                                 "Add any new categories and extensions you want to sort. Remove all other categories and extensions " \
+                                 "from your custom extensions yaml file."
+
     def __init__(self):
         #get arguments from command line
         parser = argparse.ArgumentParser(description='Organizes files by removing or renaming duplicate files and/or archiving, or moving files to their respective folders based on their file extension.')
@@ -35,6 +39,9 @@ class Main:
         parser.add_argument('-u', '--unpack', nargs='*', default=False,
                             help='Unpacks all previously sorted archives/folders in the target directory. '
                                  'If specific folders/archives are specified, only those will be unpacked.')
+        parser.add_argument('--ce', '--custom-extensions', action='store_true',
+                            help=f'Use custom extensions yaml file. \n{self.custom_extensions_help_msg}')
+
         self.args = parser.parse_args()
 
     def run(self):
@@ -45,13 +52,18 @@ class Main:
                                     self.args.rm_duplicates,
                                     logging.DEBUG if self.args.verbose else logging.INFO)
         
+
         path_to_yamls = os.path.dirname(os.path.abspath(__file__)) + "/etc"
+        #Path to default extensions file
+        extensions_file = f'{path_to_yamls}/Extensions.yaml'
+
+              
 
         fetcher = DataFetcher(file_io_reporter=reporter,
                                 settings_file=f'{path_to_yamls}/Settings.yaml',
-                                path_to_extensions_file=f'{path_to_yamls}/Extensions.yaml',
-                                target_directory=self.args.target)
-        
+                                path_to_extensions_file=extensions_file,
+                                target_directory=self.args.target,
+                                custom_mode = self.args.ce)
         reporter.fetcher = fetcher
 
         organizer = FileOrganizer(file_io_reporter=reporter,

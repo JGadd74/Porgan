@@ -182,7 +182,6 @@ class FileOrganizer:
                 #check if file exists
                 if os.path.exists(f'{file}'):
                     #TODO add more robust error handling
-                    
                     file_no_path = os.path.basename(file)
 
                     self.reporter.logger.debug(f'\tMoving {file_no_path}...')
@@ -236,7 +235,7 @@ class FileOrganizer:
                         
                         #check if file was added to archive
                         if file_no_path in zipf.namelist():
-                            self.reporter.logger.debug(f'\t{file_no_path} archived successfully.')
+                            self.reporter.logger.debug('\t[SUCESS]')
                         #if file was not added to archive
                         else:
                             self.reporter.logger.error(f'\t{file_no_path} failed to archive.')
@@ -297,8 +296,9 @@ class FileOrganizer:
 
         if list_of_targets is not None:
             for t in list_of_targets:
-                if os.path.exists(f"{self.target_directory}/{t}"):
-                    targets.append(t)
+                full_path = os.path.join(self.target_directory, t)
+                if os.path.exists(full_path):
+                    targets.append(full_path)
                 else:
                     print(f'{t} does not exist in {self.target_directory}')
             if len(targets) == 0:
@@ -308,25 +308,26 @@ class FileOrganizer:
         else:
             zips,folders = self.fetcher.get_existing_containers()
             targets = zips + folders
+            
         
         self.reporter.logger.info(f'Unpacking {len(targets)} containers...')
         
-        for target in targets:
-            
 
+
+        for target in targets:
             if target.endswith('.zip'):
-                target = f'{self.target_directory}/{target}'
-                with zipfile.ZipFile( target, 'r') as zipf:
+
+                with zipfile.ZipFile(target, 'r') as zipf:
                     self.reporter.logger.debug(f'Extracting {len(zipf.namelist())} files from {target}...')
                     zipf.extractall(f'{self.target_directory}')
                     zipf.close()
             else:
-                #go through each folder and move the files back to the taraget directory
-                for file in os.listdir(f'{self.target_directory}/{target}'):
-                    if os.path.exists(f'{self.target_directory}/{file}'):
-                        os.remove(f'{self.target_directory}/{file}')
-                    shutil.move(f"{self.target_directory}/{target}/{file}", self.target_directory)
-               
+                #go through each folder and move the files back to the target directory
+                for file in os.listdir(target):
+                    new_path = os.path.join(target,file)
+                    if os.path.exists(new_path):
+                        shutil.move(new_path, self.target_directory)
+        #TODO break this out into separate function
         #Delete all folders and archives
         if len(targets) > 0:
 
@@ -334,19 +335,22 @@ class FileOrganizer:
             
             for target in targets:
                 if target.endswith('.zip'):
-                    with zipfile.ZipFile(f'{self.target_directory}/{target}', 'r') as zipf:
-                        #if zipfile is empty, delete it
-                        if len(zipf.namelist()) == 0:
-                            self.reporter.logger.debug(f'Deleting {target}...')
-                            os.remove(f'{self.target_directory}/{target}')
-                        else:
-                            self.reporter.logger.debug(f'{target} is not empty. Skipping...')
+                    succesfully_extracted = True
+                    with zipfile.ZipFile(target, 'r') as zipf:
+                        for file in zipf.namelist():
+                            if not self.fetcher.verify_extraction(file):
+                                succesfully_extracted = False
+                            
                         zipf.close()
+                    if succesfully_extracted:
+                        self.reporter.logger.debug(f'Deleting {target}...')
+                        os.remove(target)
+
                 else:
                     #if folder is empty, delete it
-                    if len(os.listdir(f'{self.target_directory}/{target}')) == 0:
+                    if len(os.listdir(target)) == 0:
                         self.reporter.logger.debug(f'Deleting {target}...')
-                        os.rmdir(f'{self.target_directory}/{target}')
+                        os.rmdir(target)
                     else:
                         self.reporter.logger.debug(f'{target} is not empty. Skipping...')
             self.reporter.logger.debug('Cleanup complete.\n')
