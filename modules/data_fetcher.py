@@ -9,7 +9,7 @@ class DataFetcher:
     """
         This class loads and fetches data for other classes.
         """
-    def __init__(self, file_io_reporter, settings_file, path_to_extensions_file, target_directory = None, custom_mode = False):
+    def __init__(self, file_io_reporter, settings_file, path_to_extensions_file, target_directory = None):
         """
             parameters:
                - file_io_reporter (object) - the file_io_reporter object to use for logging
@@ -23,33 +23,9 @@ class DataFetcher:
         self.extensions_dictionary = self._load_yaml(path_to_extensions_file)
         self._set_target_directory(target_directory)
         self.file_list = self.get_file_list() # type: list[str]
-        self.new_file_extensions = [] # type: list[str]
-        self.custom_mode = custom_mode # type: bool
-        
-        self.default_extensions_dictionary = self.settings['default_extensions'] # type: str
-        self.custom_extensions_dictionary = self.settings['custom_extensions'] # type: str
+        self.new_file_extensions = [] # type: list[str]      
 
-    def _get_custom_extensions_dictionary(self, custom_extensions_file) -> dict:
-        
-        if custom_extensions_file is not None:
-            if os.path.isfile(custom_extensions_file):
-                return self._load_yaml(custom_extensions_file)
-            
-            self.reporter.logger.error("Custom extensions file not found at path:", custom_extensions_file)
-            self.reporter.logger.error("Exiting...")
-            sys.exit()
-        else:
-            if self.settings['custom_extensions'] is not None:
-                if os.path.isfile(self.settings['custom_extensions']):
-                    return self._load_yaml(self.settings['custom_extensions'])
-                
-                self.reporter.logger.error("Custom extensions file not found at path:", self.settings['custom_extensions'])
-                self.reporter.logger.error("Exiting...")
-                sys.exit()
-            else:
-                self.reporter.logger.error("No custom extensions file found.")
-                self.reporter.logger.error("Exiting...")
-                sys.exit()
+    
 
     def _load_yaml(self, path_to_file) -> dict:
         """
@@ -271,23 +247,6 @@ class DataFetcher:
                 self.new_file_extensions = unknown_types
         return file_dictionary
     
-    def create_custom_file_dictionary(self, file_list, extensions_dictionary):
-        # run create_file_dictionary(file_list, extensions_dictionary)
-        #split dictionary returned into two dictionaries
-        #one with known extensions, one with unknown extensions
-        #the unknown are extensions that didn't match the custom dictionary
-        #pass unknowns to create_file_dictionary(unknowns_files) no dictionary to use default
-        #combine the two dictionaries
-        #return the combined dictionary
-
-        #TODO tesssstttttt
-        
-        base_dict = self.create_file_dictionary(file_list, extensions_dictionary)
-        unknowns = base_dict.pop('unknowns')
-        default_dict = self.create_file_dictionary(unknowns)
-        base_dict.update(default_dict)
-        return base_dict
-
     def get_target_directory(self) -> str:
         """This function returns the target directory."""
         return self._new_target_directory

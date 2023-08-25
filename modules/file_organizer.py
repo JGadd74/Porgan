@@ -91,7 +91,6 @@ class FileOrganizer:
     #safely remove/rename duplicate files
     def remove_duplicates_files(self):
         """This method safely removes duplicate files"""  
-        #TODO test orphan renaming
         #TODO move files to temp folder and delete later
         #TODO add permanant delete option to settings.yaml
         #TODO add restore functionionality
@@ -294,9 +293,11 @@ class FileOrganizer:
         
         targets = []
 
-        if list_of_targets is not None:
+        if list_of_targets is not None and len(list_of_targets) > 0:
             for t in list_of_targets:
+                print(f'not processed: {t}')
                 full_path = os.path.join(self.target_directory, t)
+                print(f"processed: {full_path}")
                 if os.path.exists(full_path):
                     targets.append(full_path)
                 else:
@@ -304,7 +305,6 @@ class FileOrganizer:
             if len(targets) == 0:
                 print('No valid targets found.')
                 return
-            
         else:
             zips,folders = self.fetcher.get_existing_containers()
             targets = zips + folders
@@ -324,33 +324,46 @@ class FileOrganizer:
             else:
                 #go through each folder and move the files back to the target directory
                 for file in os.listdir(target):
-                    new_path = os.path.join(target,file)
-                    if os.path.exists(new_path):
-                        shutil.move(new_path, self.target_directory)
+                    new_file_path = os.path.join(target,file)
+                    if os.path.exists(new_file_path):
+                        if os.path.exists(os.path.join(self.target_directory,file)):
+                            os.remove(os.path.join(self.target_directory,file))
+                        shutil.move(new_file_path, self.target_directory)
+        
         #TODO break this out into separate function
         #Delete all folders and archives
         if len(targets) > 0:
+            self.remove_empty_containers(targets)
 
-            self.reporter.logger.info("Running cleanup...")
+    def remove_empty_containers(self, targets):
+        """This function removes all empty folders and archives in the target directory"""
+        #TODO return true if all targets were removed and return false, with failed targets, if any targets failed to be removed
+        #return true, None
+        #return false, [list, of, failed, targets (strings)]
+        self.reporter.logger.info("Running cleanup...")
+        
+        #remove zips and folders
+        for target in targets:
+
+            #remove zips
+            if target.endswith('.zip'):
+                succesfully_extracted = True
+                with zipfile.ZipFile(target, 'r') as zipf:
+                    for file in zipf.namelist():
+                        if not self.fetcher.verify_extraction(file):
+                            succesfully_extracted = False
+                        
+                    zipf.close()
+                if succesfully_extracted:
+                    self.reporter.logger.debug(f'Deleting {target}...')
+                    os.remove(target)
             
-            for target in targets:
-                if target.endswith('.zip'):
-                    succesfully_extracted = True
-                    with zipfile.ZipFile(target, 'r') as zipf:
-                        for file in zipf.namelist():
-                            if not self.fetcher.verify_extraction(file):
-                                succesfully_extracted = False
-                            
-                        zipf.close()
-                    if succesfully_extracted:
-                        self.reporter.logger.debug(f'Deleting {target}...')
-                        os.remove(target)
-
+            #remove folders
+            else:
+                #if folder is empty, delete it
+                if len(os.listdir(target)) == 0:
+                    self.reporter.logger.debug(f'Deleting {target}...')
+                    os.rmdir(target)
                 else:
-                    #if folder is empty, delete it
-                    if len(os.listdir(target)) == 0:
-                        self.reporter.logger.debug(f'Deleting {target}...')
-                        os.rmdir(target)
-                    else:
-                        self.reporter.logger.debug(f'{target} is not empty. Skipping...')
-            self.reporter.logger.debug('Cleanup complete.\n')
+                    self.reporter.logger.debug(f'{target} is not empty. Skipping...')
+        self.reporter.logger.debug('Cleanup complete.\n')
